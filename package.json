@@ -1,7 +1,7 @@
 {
   "name": "patreon-dl-gui",
   "productName": "patreon-dl-gui",
-  "version": "2.10.3",
+  "version": "2.10.4",
   "customName": "cw custom",
   "customEdition": "cw3",
   "description": "GUI for patreon-dl",
@@ -64,6 +64,7 @@
     "vite-plugin-static-copy": "^3.1.0"
   },
   "dependencies": {
+    "@patrickkfkan/cross-spawn": "^7.1.0",
     "bootswatch": "^5.3.3",
     "cheerio": "^1.0.0",
     "classnames": "^2.5.1",
@@ -76,7 +77,7 @@
     "material-icons": "^1.13.13",
     "material-symbols": "^0.28.1",
     "normalize-url": "^8.0.1",
-    "patreon-dl": "^3.9.0",
+    "patreon-dl": "file:../patreon-dl-master",
     "portfinder": "^1.0.35",
     "proxy-chain": "^2.5.8",
     "react": "^19.0.0",
