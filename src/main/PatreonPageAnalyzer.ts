@@ -1,0 +1,810 @@
+import type { Tier } from "./types/UIConfig";
+import { PATREON_URL } from "./Constants";
+import type { URLAnalysis } from "patreon-dl";
+import { load as cheerioLoad } from "cheerio";
+import PatreonDownloader from "patreon-dl";
+import _ from 'lodash';
+import fs from "fs";
+import path from "path";
+import { app } from "electron";
+
+export interface CustomRules {
+  urlRules?: {
+    stripPrefixes?: string[];
+    description?: string;
+  };
+}
+
+const DEFAULT_PREFIXES: string[] = ["c", "cw"];
+
+export interface AnalyzerRequestOptions {
+  proxy?: {
+    url: string;
+    rejectUnauthorizedTLS: boolean;
+  } | null;
+  userAgent: string;
+  cookie: string;
+  currentURL?: string;
+  destinationDir?: string;
+}
+
+// "Custom domain" paths and rules not fully tested.
+// Included possible combinations just in case any of
+// them turns up.
+
+const PAGE_PATHNAME_FORMATS = {
+  postsByUser: [
+    "/cw/[vanity]/[[...tab]]",
+    "/[vanity]/[[...tab]]",
+    "/c/[vanity]/[[...tab]]",
+    "/cw/[vanity]/posts",
+    "/[vanity]/posts",
+    "/c/[vanity]/posts",
+    // Custom domain
+    "/cw/_customdomain/[[...tab]]",
+    "/_customdomain/[[...tab]]",
+    "/c/_customdomain/[[...tab]]",
+    "/cw/_customdomain/posts",
+    "/_customdomain/posts",
+    "/c/_customdomain/posts"
+  ],
+  post: [
+    "/posts/[postId]",
+    // Custom domain
+    "/_customdomain/posts/[postId]"
+  ],
+  postsByCollection: [
+    "/collection/[collectionId]",
+    // Custom domain
+    "/_customdomain/collection/[collectionId]"
+  ],
+  product: [
+    "/[vanity]/shop/[productId]",
+    // Custom domain
+    "/_customdomain/shop/[productId]"
+  ],
+  shop: [
+    "/[vanity]/shop",
+    "/c/[vanity]/shop",
+    "/cw/[vanity]/shop",
+    // Custom domain
+    "/_customdomain/shop",
+    "/c/_customdomain/shop",
+    "/cw/_customdomain/shop"
+  ]
+};
+
+// First path segment of URLs that do not refer to a creator's vanity.
+const NON_VANITY_PATH_SEGMENTS = [
+  "posts",
+  "collection",
+  "user",
+  "home",
+  "search",
+  "explore",
+  "checkout",
+  "join",
+  "login",
+  "signup",
+  "settings",
+  "messages",
+  "notifications",
+  "api",
+  "oauth2",
+  "dashboard",
+  "creator-hub"
+];
+
+const NEXTJS_PATHNAME_REGEX = {
+  postsByUser: [
+    /\/cw\/(?:.+)\/posts(?:\?(.+)?)?$/,
+    // Custom domain
+    /\/_customdomain\/posts/
+  ],
+  shop: [
+    /\/cw\/(?:.+)\/shop(?:\?(.+)?)?$/,
+    // Custom domain
+    /\/_customdomain\/shop/
+  ],
+  collection: [
+    /\/collection\/(.+?)(?:\?(.+)?)?$/
+  ]
+};
+
+type PageAnalysis = Pick<
+  PatreonPageAnalysis & { status: "complete" },
+  "normalizedURL" | "target"
+>;
+
+interface JSONWithPageBootstrap {
+  props: {
+    pageProps: {
+      bootstrapEnvelope: {
+        pageBootstrap: Record<string, unknown>;
+      };
+    };
+  };
+  page?: string;
+  query?: {
+    vanity?: string;
+    u?: string;
+    productId?: string; // {slug}-{id}
+    postId?: string; // {slug}-{id}
+    collectionId?: string; // {id}
+  };
+}
+
+export type PatreonPageAnalysis =
+  | {
+    status: "complete";
+    normalizedURL: string | null;
+    target: (URLAnalysis & { description: string }) | null;
+    tiers: Tier[] | null;
+    campaignId: string | null;
+  }
+  | {
+    status: "bootstrapNotFound";
+  };
+
+export default class PatreonPageAnalyzer {
+  static async isPatreonPage(html: string) {
+    const $ = cheerioLoad(html);
+    const scripts = $('script[type="application/ld+json"]').toArray();
+    for (const script of scripts) {
+      const scriptContent = $(script).html();
+      if (scriptContent) {
+        try {
+          const json = JSON.parse(scriptContent);
+          const matchContext = [
+            "http://schema.org/",
+            "https://schema.org/"
+          ].includes(String(json["@context"]));
+          const matchUrl =
+            matchContext &&
+            ["http://www.patreon.com", "https://www.patreon.com"].includes(
+              String(json["url"])
+            );
+          if (
+            json["@type"] === "Organization" &&
+            json["name"] === "Patreon" &&
+            matchUrl
+          ) {
+            return true;
+          }
+        } catch (_) {
+          // Do nothing
+        }
+      }
+    }
+    return false;
+  }
+
+  static async analyze(
+    html: string,
+    signal: AbortSignal,
+    requestOptions: AnalyzerRequestOptions
+  ): Promise<PatreonPageAnalysis> {
+    let an: PageAnalysis | null = null;
+    let tiers: Tier[] | null = null;
+    let campaignId: string | null = null;
+    let bootstrapNotFound = false;
+    const json = await this.#getJSONWithPageBootstrap(html);
+    if (json) {
+      const _an = (an = this.#analyzePage(json));
+      tiers = this.#getTiers(json);
+      campaignId = _an?.campaignId ?? null;
+    } else {
+      const isNextJSStreamingResponse = html.includes("self.__next_f.push");
+      if (isNextJSStreamingResponse) {
+        an = this.#analyzeNextJSStreamingResponse(html);
+        try {
+          const ct = await this.#getCampaignIdAndTiersFromStreamingResponse(
+            html,
+            signal,
+            requestOptions
+          );
+          campaignId = ct?.campaignId ?? null;
+          tiers = ct?.tiers ?? null;
+        } catch (error) {
+          if (!signal.aborted) {
+            throw error;
+          }
+        }
+        bootstrapNotFound = !an && !tiers;
+      } else {
+        bootstrapNotFound = true;
+      }
+    }
+    if (signal.aborted) {
+      console.debug("PatreonPageAnalyzer: aborted");
+      const abortError = new Error("Aborted");
+      abortError.name = "AbortError";
+      throw abortError;
+    }
+
+    // Fallback to the actual browser URL when Patreon's internal
+    // bootstrap / Next.js data fails to identify the target.
+    if ((!an || !an.target) && requestOptions.currentURL) {
+      const urlAnalysis = this.#analyzeURL(
+        requestOptions.currentURL,
+        requestOptions
+      );
+
+      if (urlAnalysis) {
+        console.debug(
+          `PatreonPageAnalyzer: identified target from URL fallback: ${requestOptions.currentURL}`
+        );
+
+        an = urlAnalysis;
+        bootstrapNotFound = false;
+      }
+    }
+
+    if (bootstrapNotFound) {
+      return {
+        status: "bootstrapNotFound"
+      };
+    } return {
+      status: "complete",
+      normalizedURL: an?.normalizedURL || null,
+      target: an?.target || null,
+      tiers,
+      campaignId
+    };
+  }
+
+  static #getUrlPrefixes(destinationDir?: string): string[] {
+    const candidatePaths: string[] = [];
+
+    if (
+      destinationDir &&
+      typeof destinationDir === "string" &&
+      destinationDir.trim().length > 0
+    ) {
+      candidatePaths.push(path.join(destinationDir.trim(), ".patreon-dl", "custom-rules.json"));
+    }
+
+    try {
+      const userDataDir = app.getPath("userData");
+      candidatePaths.push(path.join(userDataDir, "custom-rules.json"));
+    } catch {
+      // Ignore if app.getPath is unavailable
+    }
+
+    for (const configPath of candidatePaths) {
+      try {
+        if (fs.existsSync(configPath)) {
+          const rawData = fs.readFileSync(configPath, "utf-8");
+          const parsed: CustomRules = JSON.parse(rawData);
+          if (
+            parsed &&
+            parsed.urlRules &&
+            Array.isArray(parsed.urlRules.stripPrefixes)
+          ) {
+            return Array.from(
+              new Set([...DEFAULT_PREFIXES, ...parsed.urlRules.stripPrefixes])
+            );
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `[PatreonPageAnalyzer] Failed to read custom rules from ${configPath}:`,
+          err
+        );
+      }
+    }
+
+    return DEFAULT_PREFIXES;
+  }
+
+  /**
+   * Identifies the target from the URL of the page loaded in the browser view.
+   * This is a fallback for when the page data returned by Patreon does not
+   * contain the information needed to identify the target. It covers the same
+   * URL formats as `PAGE_PATHNAME_FORMATS`.
+   */
+  static #analyzeURL(
+    currentURL?: string,
+    options?: AnalyzerRequestOptions
+  ): PageAnalysis | null {
+    if (!currentURL) {
+      return null;
+    }
+    let url: URL;
+    try {
+      url = new URL(currentURL);
+    } catch (_error: unknown) {
+      console.warn(`PatreonPageAnalyzer: invalid URL "${currentURL}"`);
+      return null;
+    }
+    console.debug(`PatreonPageAnalyzer: analyzing URL "${currentURL}"`);
+
+    const segments = url.pathname
+      .split("/")
+      .filter((segment) => segment.length > 0)
+      .map((segment) => {
+        try {
+          return decodeURIComponent(segment);
+        } catch (_error: unknown) {
+          return segment;
+        }
+      });
+
+    const stripPrefixes = PatreonPageAnalyzer.#getUrlPrefixes(
+      options?.destinationDir
+    );
+    if (segments.length > 0 && stripPrefixes.includes(segments[0])) {
+      segments.shift();
+    }
+    const [first, second, third] = segments;
+
+    const __result = (
+      an: URLAnalysis,
+      normalizedURL: string
+    ): PageAnalysis => ({
+      normalizedURL,
+      target: {
+        ...an,
+        description: this.#getTargetDesc(an)
+      }
+    });
+
+    // /user/posts?u=[userId]
+    const userId = url.searchParams.get("u");
+    if (first === "user" && userId) {
+      return __result(
+        { type: "postsByUserId", userId },
+        `${PATREON_URL}/user/posts?u=${userId}`
+      );
+    }
+
+    // /posts/[postId]
+    if (first === "posts" && second) {
+      const { slug, id } = this.#parseSlugId(second);
+      if (id) {
+        return __result(
+          { type: "post", postId: id, slug: slug ?? undefined },
+          `${PATREON_URL}/posts/${second}`
+        );
+      }
+      return null;
+    }
+
+    // /collection/[collectionId]
+    if (first === "collection" && second) {
+      const { id } = this.#parseSlugId(second);
+      const collectionId = id || second;
+      return __result(
+        { type: "postsByCollection", collectionId },
+        `${PATREON_URL}/collection/${collectionId}`
+      );
+    }
+
+    if (!first || NON_VANITY_PATH_SEGMENTS.includes(first)) {
+      return null;
+    }
+
+    // /[vanity]/posts/[postId]
+    if (second === "posts" && third) {
+      const { slug, id } = this.#parseSlugId(third);
+      if (id) {
+        return __result(
+          { type: "post", postId: id, slug: slug ?? undefined },
+          `${PATREON_URL}/posts/${third}`
+        );
+      }
+      return null;
+    }
+
+    // /[vanity]/shop/[productId]
+    if (second === "shop" && third) {
+      const { slug, id } = this.#parseSlugId(third);
+      if (slug && id) {
+        return __result(
+          { type: "product", productId: id, slug },
+          `${PATREON_URL}/${first}/shop/${third}`
+        );
+      }
+      return null;
+    }
+
+    // /[vanity]/shop
+    if (second === "shop") {
+      return __result(
+        { type: "shop", vanity: first },
+        `${PATREON_URL}/${first}/shop`
+      );
+    }
+
+    // /[vanity]/[[...tab]]
+    return __result(
+      { type: "postsByUser", vanity: first },
+      `${PATREON_URL}/${first}/posts`
+    );
+  }
+
+  static async #getJSONWithPageBootstrap(
+    html: string
+  ): Promise<JSONWithPageBootstrap | null> {
+    const $ = cheerioLoad(html);
+    const scripts = $('script[id="__NEXT_DATA__"]').toArray();
+    for (const scriptEl of scripts) {
+      const script = $(scriptEl);
+      if (script.attr("type") === "application/json") {
+        try {
+          const json = JSON.parse(script.text());
+          const bs = json?.props?.pageProps?.bootstrapEnvelope?.pageBootstrap;
+          if (bs && typeof bs === "object") {
+            return json;
+          }
+        } catch (_error: unknown) {
+          // Do nothing
+        }
+      }
+    }
+    return null;
+  }
+
+  static #analyzePage(
+    json: JSONWithPageBootstrap
+  ): (PageAnalysis & { campaignId: string | null }) | null {
+    const page = json.page;
+    console.debug('PatreonPageAnalyzer: "page" value in bootstrap:', page);
+    console.debug(
+      'PatreonPageAnalyzer: "query" value in bootstrap:',
+      json.query
+    );
+    if (!page || typeof page !== "string") {
+      return null;
+    }
+
+    const {
+      vanity,
+      u: userId,
+      postId,
+      collectionId,
+      productId
+    } = json.query && typeof json.query === "object" ? json.query : {};
+
+    const campaignId =
+      _.get(json, "props.pageProps.bootstrapEnvelope.pageBootstrap.campaign.data.id", null);
+    console.debug(
+      'PatreonPageAnalyzer: "campaign_id" value in bootstrap:',
+      campaignId
+    );
+
+    if (
+      PAGE_PATHNAME_FORMATS.postsByUser.includes(page) &&
+      typeof userId === "string"
+    ) {
+      const an: URLAnalysis = {
+        type: "postsByUserId",
+        userId
+      };
+      return {
+        normalizedURL: `${PATREON_URL}/user/posts?u=${userId}`,
+        target: {
+          ...an,
+          description: this.#getTargetDesc(an)
+        },
+        campaignId
+      };
+    }
+    if (
+      PAGE_PATHNAME_FORMATS.postsByUser.includes(page) &&
+      typeof vanity === "string"
+    ) {
+      const an: URLAnalysis = {
+        type: "postsByUser",
+        vanity
+      };
+      return {
+        normalizedURL: `${PATREON_URL}/${vanity}/posts`,
+        target: {
+          ...an,
+          description: this.#getTargetDesc(an)
+        },
+        campaignId
+      };
+    }
+    if (
+      PAGE_PATHNAME_FORMATS.post.includes(page) &&
+      typeof postId === "string"
+    ) {
+      const { slug, id } = this.#parseSlugId(postId);
+      if (id) {
+        const an: URLAnalysis = {
+          type: "post",
+          postId: id,
+          slug: slug ?? undefined
+        };
+        return {
+          normalizedURL: `${PATREON_URL}/posts/${postId}`,
+          target: {
+            ...an,
+            description: this.#getTargetDesc(an)
+          },
+          campaignId
+        };
+      }
+      return null;
+    }
+    if (
+      PAGE_PATHNAME_FORMATS.postsByCollection.includes(page) &&
+      typeof collectionId === "string"
+    ) {
+      const an: URLAnalysis = {
+        type: "postsByCollection",
+        collectionId
+      };
+      return {
+        normalizedURL: `${PATREON_URL}/collection/${collectionId}`,
+        target: {
+          ...an,
+          description: this.#getTargetDesc(an)
+        },
+        campaignId
+      };
+    }
+    if (
+      PAGE_PATHNAME_FORMATS.product.includes(page) &&
+      typeof vanity === "string" &&
+      typeof productId === "string"
+    ) {
+      const { slug, id } = this.#parseSlugId(productId);
+      if (slug && id) {
+        const an: URLAnalysis = {
+          type: "product",
+          productId: id,
+          slug
+        };
+        return {
+          normalizedURL: `${PATREON_URL}/${vanity}/shop/${productId}`,
+          target: {
+            ...an,
+            description: this.#getTargetDesc(an)
+          },
+          campaignId
+        };
+      }
+      return null;
+    }
+    if (
+      PAGE_PATHNAME_FORMATS.shop.includes(page) &&
+      typeof vanity === "string"
+    ) {
+      const an: URLAnalysis = {
+        type: "shop",
+        vanity
+      };
+      return {
+        normalizedURL: `${PATREON_URL}/${vanity}/shop`,
+        target: {
+          ...an,
+          description: this.#getTargetDesc(an)
+        },
+        campaignId
+      };
+    }
+    return null;
+  }
+
+  static #analyzeNextJSStreamingResponse(html: string): PageAnalysis | null {
+    const vanityRegex =
+      /\\(?:\\?)"vanity\\(?:\\?)":\\(?:\\?)"(.+?)\\(?:\\?)"/gm;
+    const vanityMatch = vanityRegex.exec(html);
+    const vanity = vanityMatch && vanityMatch[1];
+    console.debug(
+      'PatreonPageAnalyzer: "vanity" value in Next.js streaming response:',
+      vanity
+    );
+
+    const pathnameRegex = /\\"pathname\\":\\"(.+?)\\"/gm;
+    const pathnameMatch = pathnameRegex.exec(html);
+    const pathname = pathnameMatch && pathnameMatch[1];
+    console.debug(
+      'PatreonPageAnalyzer: "pathname" value in Next.js streaming response:',
+      pathname
+    );
+    if (!pathname) {
+      return null;
+    }
+
+    if (
+      NEXTJS_PATHNAME_REGEX.postsByUser.some((regex) => regex.test(pathname)) &&
+      vanity
+    ) {
+      const an: URLAnalysis = {
+        type: "postsByUser",
+        vanity
+      };
+      return {
+        normalizedURL: `${PATREON_URL}/${vanity}/posts`,
+        target: {
+          ...an,
+          description: this.#getTargetDesc(an)
+        }
+      };
+    }
+    if (
+      NEXTJS_PATHNAME_REGEX.shop.some((regex) => regex.test(pathname)) &&
+      vanity
+    ) {
+      const an: URLAnalysis = {
+        type: "shop",
+        vanity
+      };
+      return {
+        normalizedURL: `${PATREON_URL}/${vanity}/shop`,
+        target: {
+          ...an,
+          description: this.#getTargetDesc(an)
+        }
+      };
+    }
+    // Collection
+    const collectionId = (() => {
+      for (const regex of NEXTJS_PATHNAME_REGEX.collection) {
+        const m = regex.exec(pathname);
+        if (m && m[1]) {
+          return m[1];
+        }
+      }
+      return null;
+    })();
+    if (collectionId) {
+      const an: URLAnalysis = {
+        type: 'postsByCollection',
+        collectionId
+      };
+      return {
+        normalizedURL: `${PATREON_URL}/collection/${collectionId}`,
+        target: {
+          ...an,
+          description: this.#getTargetDesc(an)
+        }
+      };
+    }
+    return null;
+  }
+
+  static async #getCampaignIdAndTiersFromStreamingResponse(
+    html: string,
+    signal: AbortSignal,
+    requestOptions: AnalyzerRequestOptions
+  ) {
+    const campaignIdRegex =
+      /campaign_id\\(?:\\?)",\\(?:\\?)"unit_id\\(?:\\?)":\\(?:\\?)"(.+?)\\(?:\\?)"/gm;
+    const campaignIdMatch = campaignIdRegex.exec(html);
+    const campaignId = campaignIdMatch && campaignIdMatch[1];
+    if (!campaignId) {
+      console.warn(
+        'PatreonPageAnalyzer: "campaign_id" not found in Next.js streaming response'
+      );
+      return null;
+    }
+    console.debug(
+      'PatreonPageAnalyzer: "campaign_id" value in Next.js streaming response:',
+      campaignId
+    );
+    const campaign = await PatreonDownloader.getCampaign(
+      { campaignId },
+      signal,
+      {
+        cookie: requestOptions.cookie,
+        request: {
+          proxy: requestOptions.proxy,
+          userAgent: requestOptions.userAgent
+        }
+      }
+    );
+    if (campaign) {
+      const __parseTierTitle = (id: string, value: string | null) =>
+        value || (id === "-1" ? "Public" : `Tier #${id}`);
+      const tiers = campaign?.rewards.map<Tier>((reward) => ({
+        id: reward.id,
+        title: __parseTierTitle(reward.id, reward.title)
+      }));
+      return {
+        tiers,
+        campaignId
+      };
+    }
+    return null;
+  }
+
+  static #getTargetDesc(target: URLAnalysis) {
+    switch (target.type) {
+      case "post":
+        return `Post #${target.postId}`;
+      case "postsByCollection":
+        return `Posts in collection #${target.collectionId}`;
+      case "postsByUser":
+        return `Posts by user "${target.vanity}"`;
+      case "postsByUserId":
+        return `Posts by user #${target.userId}`;
+      case "product":
+        return `Product #${target.productId}`;
+      case "shop":
+        return `Shop of user "${target.vanity}"`;
+      default:
+        return "";
+    }
+  }
+
+  static #getTiersFromPageBootstrap(bs: object) {
+    const campaign = Reflect.get(bs, "campaign");
+    const rewards = campaign?.data?.relationships?.rewards?.data;
+    const included = campaign?.included;
+    if (!Array.isArray(rewards) || !Array.isArray(included)) {
+      return undefined;
+    }
+
+    const ids = rewards.reduce<string[]>((result, value) => {
+      if (
+        value &&
+        typeof value === "object" &&
+        Reflect.get(value, "type") === "reward"
+      ) {
+        const id = Reflect.get(value, "id");
+        if (id !== undefined && id !== null) {
+          result.push(String(id));
+        }
+      }
+      return result;
+    }, []);
+
+    const __parseTierTitle = (id: string, value: string | null) =>
+      value || (id === "-1" ? "Public" : `Tier #${id}`);
+
+    const tiers = ids.reduce<Tier[]>((result, id) => {
+      included.forEach((inc) => {
+        const incId =
+          typeof inc === "object" && Reflect.has(inc, "id") ?
+            String(inc.id)
+            : null;
+        if (incId === id && Reflect.get(inc, "type") === "reward") {
+          const attr = Reflect.get(inc, "attributes");
+          if (typeof attr === "object") {
+            const title = __parseTierTitle(id, Reflect.get(attr, "title"));
+            result.push({
+              id,
+              title
+            });
+          }
+        }
+      });
+      return result;
+    }, []);
+    return tiers.length > 0 ? tiers : undefined;
+  }
+
+  static #getTiers(json: JSONWithPageBootstrap | null) {
+    if (json) {
+      return (
+        this.#getTiersFromPageBootstrap(
+          json.props.pageProps.bootstrapEnvelope.pageBootstrap
+        ) || null
+      );
+    }
+    return null;
+  }
+
+  static #parseSlugId(s: string) {
+    // Check if ID only - no slug
+    if (!isNaN(Number(s))) {
+      return {
+        slug: null,
+        id: s
+      };
+    }
+    const match = /(.+)-(\d+)$/.exec(s);
+    if (match?.length === 3) {
+      return {
+        slug: match[1],
+        id: match[2]
+      };
+    }
+    return { slug: null, id: null };
+  }
+}

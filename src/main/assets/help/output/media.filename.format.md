@@ -1,0 +1,44 @@
+## Media filename format
+
+---
+
+Filename format of a downloaded item. A format is a string pattern consisting of fields enclosed in curly braces.
+
+##### Required fields
+
+A format must contain at least one of the following fields:
+
+| Field            | Description                                                                                                                                                                                                          |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `media.id`       | ID of the item downloaded (assigned by Patreon).                                                                                                                                                                     |
+| `media.filename` | Can be one of the following, in order of availability:<ul><li>original filename included in the item's API data; or</li><li>filename derived from the header of the response to the HTTP download request.</li></ul> |
+
+##### Optional fields
+
+In addition, a format may contain the following fields:
+
+| Field           | Description                                                                                 |
+| --------------- | ------------------------------------------------------------------------------------------- |
+| `media.type`    | Type of item (e.g. "image" or "video").                                                     |
+| `media.index`   | If the item is an image in the content of a post, the index of the item (starting from 0).  |
+| `media.variant` | Where applicable, the variant of the item (e.g. "original", "thumbnailSmall"...for images). |
+| `src.type`      | The type of the items's source: "post", "product", "campaign" or "collection".              |
+| `src.id`        | The ID of the items's source.                                                               |
+| `src.title`     | Title of the item's source.                                                                 |
+| `src.date`      | The publish / creation date of the item's source.                                           |
+
+If you enabled "All media variants", `media.variant` will be appended to the filename regardless of whether you have included it in the format.
+
+Sometimes `media.filename` could not be obtained, in which case it will be replaced with `media.id`, unless it is already present in the format.
+
+##### Conditional separators
+
+Characters enclosed in square brackets followed by a question mark denote conditional separators. If the value of a field could not be obtained or is empty, the conditional separator immediately adjacent to it will be omitted from the name.
+
+`media.index` should be used with conditional separators, since an item might not have an index. So, instead of "{media.index}-{media.filename}", you would want to use "{media.index}[ - ]?{media.filename}".
+
+---
+
+Default: `{media.filename}`
+
+Fallback: `{media.type}-{media.id}`
