@@ -152,6 +152,7 @@ function convertPatreonDLOptionsToUIConfig(
     request: {
       "max.retries": p.request.maxRetries,
       "max.concurrent": p.request.maxConcurrent,
+      "max.concurrent.posts": p.request.maxConcurrentPosts ?? 1,
       "min.time": p.request.minTime,
       "proxy.url": p.request.proxy?.url ?? "",
       "proxy.reject.unauthorized.tls":

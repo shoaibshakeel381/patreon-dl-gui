@@ -102,6 +102,7 @@ export function convertUIConfigToPatreonDLOptions(
     request: {
       maxRetries: uiConfig.request["max.retries"],
       maxConcurrent: uiConfig.request["max.concurrent"],
+      maxConcurrentPosts: uiConfig.request["max.concurrent.posts"],
       minTime: uiConfig.request["min.time"],
       proxy:
         uiConfig.request["proxy.url"].trim() ?

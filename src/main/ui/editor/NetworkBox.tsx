@@ -106,10 +106,17 @@ function NetworkBox() {
             />
             <TextInputRow
               type="number"
+              config={["request", "max.concurrent.posts"]}
+              label="Max concurrent posts"
+              helpTooltip="Maximum number of posts processed concurrently."
+              ariaLabel="Maximum concurrent posts"
+            />
+            <TextInputRow
+              type="number"
               config={["request", "max.concurrent"]}
-              label="Max concurrent downloads"
-              helpTooltip="Maximum number of concurrent downloads."
-              ariaLabel="Maximum concurrent downloads"
+              label="Max concurrent downloads per post"
+              helpTooltip="Maximum number of concurrent downloads per post."
+              ariaLabel="Maximum concurrent downloads per post"
             />
             <TextInputRow
               type="number"

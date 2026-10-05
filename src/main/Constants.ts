@@ -65,6 +65,7 @@ export const FILE_CONFIG_SECTION_PROPS = {
   request: [
     "max.retries",
     "max.concurrent",
+    "max.concurrent.posts",
     "min.time",
     "proxy.url",
     "proxy.reject.unauthorized.tls",

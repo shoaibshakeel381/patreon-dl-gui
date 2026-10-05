@@ -127,6 +127,9 @@ export function convertUIConfigToFileContents(
     request: {
       "max.retries": numberToString(config.request["max.retries"]),
       "max.concurrent": numberToString(config.request["max.concurrent"]),
+      "max.concurrent.posts": numberToString(
+        config.request["max.concurrent.posts"]
+      ),
       "min.time": numberToString(config.request["min.time"]),
       "proxy.url": config.request["proxy.url"].trim(),
       "proxy.reject.unauthorized.tls": booleanToString(

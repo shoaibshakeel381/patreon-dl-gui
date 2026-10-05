@@ -785,6 +785,12 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
         defaultConfig.request["max.concurrent"],
         toNumber
       ),
+      "max.concurrent.posts": __fromFileConfigValue(
+        "request",
+        "max.concurrent.posts",
+        defaultConfig.request["max.concurrent.posts"],
+        toNumber
+      ),
       "min.time": __fromFileConfigValue(
         "request",
         "min.time",

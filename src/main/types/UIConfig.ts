@@ -117,6 +117,7 @@ export interface UIConfig {
   request: {
     "max.retries": number;
     "max.concurrent": number;
+    "max.concurrent.posts": number;
     "min.time": number;
     "proxy.url": string;
     "proxy.reject.unauthorized.tls": boolean;
