@@ -106,6 +106,7 @@ export function convertUIConfigToFileContents(
         config.include["posts.with.media.type"]
       ),
       "posts.title.regex": config.include["posts.title.regex"],
+      "posts.sort.order": config.include["posts.sort.order"],
       "posts.published.after": postsPublishedAfter,
       "posts.published.before": postsPublishedBefore,
       "products.published.after": productsPublishedAfter,

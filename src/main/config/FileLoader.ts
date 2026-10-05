@@ -691,6 +691,15 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
         defaultConfig.include["posts.title.regex"],
         toString
       ),
+      "posts.sort.order": __fromFileConfigValue(
+        "include",
+        "posts.sort.order",
+        defaultConfig.include["posts.sort.order"],
+        (value) => toOneOf<UIConfig["include"]["posts.sort.order"]>(
+          value,
+          ["newest", "oldest", "popular", "collection"]
+        )
+      ),
       "posts.published": __fromFileConfigValues(
         "include",
         ["posts.published.after", "posts.published.before"],

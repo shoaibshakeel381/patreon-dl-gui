@@ -35,6 +35,7 @@ interface IncludeBoxState {
   postsInTier: UIConfig["include"]["posts.in.tier"];
   postsWithMediaType: UIConfig["include"]["posts.with.media.type"];
   postsPublished: UIConfig["include"]["posts.published"];
+  postsSortOrder: UIConfig["include"]["posts.sort.order"];
   productsPublished: UIConfig["include"]["products.published"];
   comments: boolean;
   tiers: Tier[] | null;
@@ -89,6 +90,7 @@ function getIncludeBoxState(config: UIConfig): IncludeBoxState {
     postsInTier: config.include["posts.in.tier"],
     postsWithMediaType: config.include["posts.with.media.type"],
     postsPublished: config.include["posts.published"],
+    postsSortOrder: config.include["posts.sort.order"],
     productsPublished: config.include["products.published"],
     comments: config.include["comments"],
     tiers: config["support.data"].browserObtainedValues.tiers
@@ -424,6 +426,19 @@ function IncludeBox() {
 
         <Tab className="pb-2" eventKey="include-posts" title="Posts">
           <Container fluid>
+            <Row className="py-1">
+              <Col xs={4}>Order:</Col>
+              <Col>
+                <Form.Select size="sm" value={state.postsSortOrder}
+                  onChange={(e) => setConfigValue("include", "posts.sort.order", e.currentTarget.value as UIConfig["include"]["posts.sort.order"])}
+                  aria-label="Post download order">
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="popular">Popular</option>
+                  <option value="collection">Collection Order</option>
+                </Form.Select>
+              </Col>
+            </Row>
             {createCustomSelectRow({
               prop: "posts.in.tier",
               label: "In tier",
