@@ -129,6 +129,7 @@ function convertPatreonDLOptionsToUIConfig(
             []
           : p.include.postsWithMediaType
       },
+      "posts.title.regex": p.include.postsTitleRegex || "",
       "posts.published": {
         type:
           postsPublishedAfter && postsPublishedBefore ? "between"

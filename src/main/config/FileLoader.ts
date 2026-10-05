@@ -685,6 +685,12 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
             ["image", "video", "audio", "attachment", "podcast"]
           )
       ),
+      "posts.title.regex": __fromFileConfigValue(
+        "include",
+        "posts.title.regex",
+        defaultConfig.include["posts.title.regex"],
+        toString
+      ),
       "posts.published": __fromFileConfigValues(
         "include",
         ["posts.published.after", "posts.published.before"],

@@ -46,6 +46,7 @@ export const FILE_CONFIG_SECTION_PROPS = {
     "locked.content",
     "posts.in.tier",
     "posts.with.media.type",
+    "posts.title.regex",
     "posts.published.after",
     "posts.published.before",
     "products.published.after",

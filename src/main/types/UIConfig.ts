@@ -97,6 +97,7 @@ export interface UIConfig {
     "images.by.filename": string;
     "audio.by.filename": string;
     "attachments.by.filename": string;
+    "posts.title.regex": string;
     "posts.in.tier": CustomSelectionValue<"any", string>;
     "posts.with.media.type": CustomSelectionValue<
       "any" | "none",

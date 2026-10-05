@@ -469,6 +469,12 @@ function IncludeBox() {
                 "Restrict posts downloaded by the type of media they contain.",
               ariaLabel: "Include posts containing media type"
             })}
+            <TextInputRow
+              config={["include", "posts.title.regex"]}
+              label="Skip title regex"
+              helpTooltip="Skip posts whose titles match this JavaScript regex. Enter a regex literal with delimiters and optional flags, such as /flower/i. Matching is anywhere in the title unless anchored with ^ or $. Leave blank to include all titles."
+              ariaLabel="Skip posts matching title regular expression"
+            />
             <Row className="py-1">
               <Col xs={4}>Published:</Col>
               <Col>

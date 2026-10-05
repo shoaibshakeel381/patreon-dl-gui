@@ -105,6 +105,7 @@ export function convertUIConfigToFileContents(
       "posts.with.media.type": getCustomSelectionValue(
         config.include["posts.with.media.type"]
       ),
+      "posts.title.regex": config.include["posts.title.regex"],
       "posts.published.after": postsPublishedAfter,
       "posts.published.before": postsPublishedBefore,
       "products.published.after": productsPublishedAfter,

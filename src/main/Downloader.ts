@@ -89,6 +89,7 @@ export function convertUIConfigToPatreonDLOptions(
       postsWithMediaType: fromCustomSelectionValue(
         uiConfig.include["posts.with.media.type"]
       ),
+      postsTitleRegex: uiConfig.include["posts.title.regex"],
       postsPublished: {
         after: toDateTime(fileConfig.include["posts.published.after"]),
         before: toDateTime(fileConfig.include["posts.published.before"])
