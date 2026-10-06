@@ -133,7 +133,7 @@ const config: ForgeConfig = {
         fs.writeFileSync(`${appDir}/package.json`, JSON.stringify({
           dependencies: {
             "undici": "^6.21.3",
-            "patreon-dl": "file:D:/Dev/ZZ - Not Mine Mixed/patreon-dl-master"
+            "patreon-dl": "file:D:/Dev/ZZ - Not Mine Mixed/patreon-dl/cli"
           }
         }, null, 2));
         execSync('npm install --omit=dev', { cwd: appDir, stdio: 'inherit' });
