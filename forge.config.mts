@@ -133,10 +133,14 @@ const config: ForgeConfig = {
         fs.writeFileSync(`${appDir}/package.json`, JSON.stringify({
           dependencies: {
             "undici": "^6.21.3",
-            "patreon-dl": "^3.10.1"
+            "patreon-dl": `file:${path.resolve(__dirname, '../cli').replace(/\\/g, '/')}`
           }
         }, null, 2));
-        execSync('npm install --omit=dev', { cwd: appDir, stdio: 'inherit' });
+        // npm otherwise installs file: dependencies as symlinks. The WiX
+        // maker follows that symlink and includes the entire CLI source tree
+        // in the MSI. Install a packed copy so the packaged resources stay
+        // self-contained.
+        execSync('npm install --omit=dev --install-links', { cwd: appDir, stdio: 'inherit' });
         // Rebuild better-sqlite3 to prevent NODE_MODULE_VERSION mismatch
         execSync('npx electron-rebuild', { cwd: appDir, stdio: 'inherit' });
       }
