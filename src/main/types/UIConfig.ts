@@ -98,6 +98,7 @@ export interface UIConfig {
     "audio.by.filename": string;
     "attachments.by.filename": string;
     "posts.title.regex": string;
+    "posts.excluded.collection.ids": string;
     "posts.sort.order": "newest" | "oldest" | "popular" | "collection";
     "posts.in.tier": CustomSelectionValue<"any", string>;
     "posts.with.media.type": CustomSelectionValue<

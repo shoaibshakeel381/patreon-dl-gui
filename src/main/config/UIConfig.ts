@@ -130,6 +130,7 @@ function convertPatreonDLOptionsToUIConfig(
           : p.include.postsWithMediaType
       },
       "posts.title.regex": p.include.postsTitleRegex || "",
+      "posts.excluded.collection.ids": (p.include.postsExcludedCollectionIds || []).join(", "),
       "posts.sort.order": p.include.postsSortOrder,
       "posts.published": {
         type:

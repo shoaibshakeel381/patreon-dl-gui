@@ -490,6 +490,12 @@ function IncludeBox() {
               helpTooltip="Skip posts whose titles match this JavaScript regex. Enter a regex literal with delimiters and optional flags, such as /flower/i. Matching is anywhere in the title unless anchored with ^ or $. Leave blank to include all titles."
               ariaLabel="Skip posts matching title regular expression"
             />
+            <TextInputRow
+              config={["include", "posts.excluded.collection.ids"]}
+              label="Skip collection IDs"
+              helpTooltip="Skip posts that belong to any listed collection. Enter collection IDs separated by commas. Leave blank to include posts from all collections."
+              ariaLabel="Skip posts in these collections"
+            />
             <Row className="py-1">
               <Col xs={4}>Published:</Col>
               <Col>
