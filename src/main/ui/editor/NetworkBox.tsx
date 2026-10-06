@@ -108,7 +108,7 @@ function NetworkBox() {
               type="number"
               config={["request", "max.concurrent.posts"]}
               label="Max concurrent posts"
-              helpTooltip="Maximum number of posts processed concurrently."
+              helpTooltip="Maximum number of posts processed concurrently, including when a stop condition is set. Posts already in progress may finish after the stop condition is met."
               ariaLabel="Maximum concurrent posts"
             />
             <TextInputRow
