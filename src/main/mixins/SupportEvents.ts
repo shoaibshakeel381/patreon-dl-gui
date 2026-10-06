@@ -9,6 +9,7 @@ import {
 } from "../config/WebBrowserSettings";
 import { getErrorString } from "../../common/util/Misc";
 import { resetDefaultConfig, saveDefaultConfig } from "../config/DefaultConfig";
+import packageJson from "../../../package.json";
 
 export function SupportEventSupportMixin<TBase extends MainProcessConstructor>(
   Base: TBase
@@ -90,9 +91,25 @@ export function SupportEventSupportMixin<TBase extends MainProcessConstructor>(
               { once: true }
             );
             this.win.showModalView();
+
+            const pkg = packageJson as {
+              customName?: string;
+              customEdition?: string;
+            };
+
+            const baseName = app.getName();
+            const rawCustomName = pkg.customName;
+            const customName = rawCustomName ? ` (${rawCustomName})` : "";
+            const extendedAppName = `${baseName}${customName}`;
+
+            const baseVersion = app.getVersion();
+            const rawCustomEdition = pkg.customEdition;
+            const customEdition = rawCustomEdition ? `-${rawCustomEdition}` : "";
+            const extendedVersion = `${baseVersion}${customEdition}`;
+
             this.emitRendererEvent(this.win.modalView, "aboutInfo", {
-              appName: app.getName(),
-              appVersion: app.getVersion(),
+              appName: extendedAppName,
+              appVersion: extendedVersion,
               appURL: APP_URL
             });
           });

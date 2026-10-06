@@ -91,8 +91,12 @@ export default class DownloaderConsoleLogger extends ConsoleLogger {
   }
 
   protected toOutput(level: LogLevel, msg: string[]) {
+    const text = msg.join(" ");
     this.emit("message", {
-      text: msg.join(" "),
+      text:
+        this.config.color && text.includes("Download post #") ?
+          `<span style="color: yellow;">${text}</span>`
+        : text,
       level
     });
   }
