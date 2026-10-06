@@ -22,6 +22,7 @@ export default class WebBrowserView extends WebContentsView {
     anonymizedURL: string;
     rejectUnauthorizedTLS: boolean;
   } | null;
+  #destinationDir: string | null = null;
 
   constructor(partition?: string) {
     super({
@@ -45,6 +46,10 @@ export default class WebBrowserView extends WebContentsView {
         callback({ requestHeaders: details.requestHeaders });
       }
     );
+  }
+
+  setDestinationDir(dir: string | null | undefined) {
+    this.#destinationDir = dir ? dir.trim() : null;
   }
 
   async #loadURL(url: string) {
@@ -176,11 +181,11 @@ export default class WebBrowserView extends WebContentsView {
               cookie:
                 cookie ?
                   cookie.substring(0, Math.min(cookie.length, 20)) + "..."
-                : "None found",
+                  : "None found",
               tiers:
                 analysis?.tiers ?
                   analysis.tiers.map((tier) => tier.title).join(", ")
-                : "None found"
+                  : "None found"
             },
             null,
             2
@@ -445,7 +450,9 @@ export default class WebBrowserView extends WebContentsView {
               const an = await PatreonPageAnalyzer.analyze(html, signal, {
                 proxy: this.#proxy,
                 userAgent: WebBrowserView.#userAgent,
-                cookie
+                cookie,
+                currentURL: this.webContents.getURL(),
+                destinationDir: this.#destinationDir || undefined
               });
               if (an.status === "complete") {
                 resolve(an);

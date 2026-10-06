@@ -35,6 +35,7 @@ interface IncludeBoxState {
   postsInTier: UIConfig["include"]["posts.in.tier"];
   postsWithMediaType: UIConfig["include"]["posts.with.media.type"];
   postsPublished: UIConfig["include"]["posts.published"];
+  postsSortOrder: UIConfig["include"]["posts.sort.order"];
   productsPublished: UIConfig["include"]["products.published"];
   comments: boolean;
   tiers: Tier[] | null;
@@ -89,6 +90,7 @@ function getIncludeBoxState(config: UIConfig): IncludeBoxState {
     postsInTier: config.include["posts.in.tier"],
     postsWithMediaType: config.include["posts.with.media.type"],
     postsPublished: config.include["posts.published"],
+    postsSortOrder: config.include["posts.sort.order"],
     productsPublished: config.include["products.published"],
     comments: config.include["comments"],
     tiers: config["support.data"].browserObtainedValues.tiers
@@ -424,6 +426,19 @@ function IncludeBox() {
 
         <Tab className="pb-2" eventKey="include-posts" title="Posts">
           <Container fluid>
+            <Row className="py-1">
+              <Col xs={4}>Order:</Col>
+              <Col>
+                <Form.Select size="sm" value={state.postsSortOrder}
+                  onChange={(e) => setConfigValue("include", "posts.sort.order", e.currentTarget.value as UIConfig["include"]["posts.sort.order"])}
+                  aria-label="Post download order">
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="popular">Popular</option>
+                  <option value="collection">Collection Order</option>
+                </Form.Select>
+              </Col>
+            </Row>
             {createCustomSelectRow({
               prop: "posts.in.tier",
               label: "In tier",
@@ -469,6 +484,24 @@ function IncludeBox() {
                 "Restrict posts downloaded by the type of media they contain.",
               ariaLabel: "Include posts containing media type"
             })}
+            <TextInputRow
+              config={["include", "posts.title.regex"]}
+              label="Skip title regex"
+              helpTooltip="Skip posts whose titles match this JavaScript regex. Enter a regex literal with delimiters and optional flags, such as /flower/i. Matching is anywhere in the title unless anchored with ^ or $. Leave blank to include all titles."
+              ariaLabel="Skip posts matching title regular expression"
+            />
+            <TextInputRow
+              config={["include", "posts.excluded.collection.ids"]}
+              label="Skip collection IDs"
+              helpTooltip="Skip posts that belong to any listed collection. Enter collection IDs separated by commas. Leave blank to include posts from all collections."
+              ariaLabel="Skip posts in these collections"
+            />
+            <TextInputRow
+              config={["include", "posts.excluded.tags"]}
+              label="Skip tags"
+              helpTooltip="Skip posts with any listed tag. Enter tag names separated by commas. User-defined tags match the value after the semicolon in the API tag ID, with surrounding spaces trimmed."
+              ariaLabel="Skip posts with these tags"
+            />
             <Row className="py-1">
               <Col xs={4}>Published:</Col>
               <Col>

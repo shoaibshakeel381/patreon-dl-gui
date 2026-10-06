@@ -97,6 +97,10 @@ export interface UIConfig {
     "images.by.filename": string;
     "audio.by.filename": string;
     "attachments.by.filename": string;
+    "posts.title.regex": string;
+    "posts.excluded.collection.ids": string;
+    "posts.excluded.tags": string;
+    "posts.sort.order": "newest" | "oldest" | "popular" | "collection";
     "posts.in.tier": CustomSelectionValue<"any", string>;
     "posts.with.media.type": CustomSelectionValue<
       "any" | "none",
@@ -117,6 +121,7 @@ export interface UIConfig {
   request: {
     "max.retries": number;
     "max.concurrent": number;
+    "max.concurrent.posts": number;
     "min.time": number;
     "proxy.url": string;
     "proxy.reject.unauthorized.tls": boolean;

@@ -4,6 +4,18 @@ import type { URLAnalysis } from "patreon-dl";
 import { load as cheerioLoad } from "cheerio";
 import PatreonDownloader from "patreon-dl";
 import _ from 'lodash';
+import fs from "fs";
+import path from "path";
+import { app } from "electron";
+
+export interface CustomRules {
+  urlRules?: {
+    stripPrefixes?: string[];
+    description?: string;
+  };
+}
+
+const DEFAULT_PREFIXES: string[] = ["c", "cw"];
 
 export interface AnalyzerRequestOptions {
   proxy?: {
@@ -12,6 +24,8 @@ export interface AnalyzerRequestOptions {
   } | null;
   userAgent: string;
   cookie: string;
+  currentURL?: string;
+  destinationDir?: string;
 }
 
 // "Custom domain" paths and rules not fully tested.
@@ -60,6 +74,27 @@ const PAGE_PATHNAME_FORMATS = {
   ]
 };
 
+// First path segment of URLs that do not refer to a creator's vanity.
+const NON_VANITY_PATH_SEGMENTS = [
+  "posts",
+  "collection",
+  "user",
+  "home",
+  "search",
+  "explore",
+  "checkout",
+  "join",
+  "login",
+  "signup",
+  "settings",
+  "messages",
+  "notifications",
+  "api",
+  "oauth2",
+  "dashboard",
+  "creator-hub"
+];
+
 const NEXTJS_PATHNAME_REGEX = {
   postsByUser: [
     /\/cw\/(?:.+)\/posts(?:\?(.+)?)?$/,
@@ -101,15 +136,15 @@ interface JSONWithPageBootstrap {
 
 export type PatreonPageAnalysis =
   | {
-      status: "complete";
-      normalizedURL: string | null;
-      target: (URLAnalysis & { description: string }) | null;
-      tiers: Tier[] | null;
-      campaignId: string | null;
-    }
+    status: "complete";
+    normalizedURL: string | null;
+    target: (URLAnalysis & { description: string }) | null;
+    tiers: Tier[] | null;
+    campaignId: string | null;
+  }
   | {
-      status: "bootstrapNotFound";
-    };
+    status: "bootstrapNotFound";
+  };
 
 export default class PatreonPageAnalyzer {
   static async isPatreonPage(html: string) {
@@ -186,18 +221,206 @@ export default class PatreonPageAnalyzer {
       abortError.name = "AbortError";
       throw abortError;
     }
+
+    // Fallback to the actual browser URL when Patreon's internal
+    // bootstrap / Next.js data fails to identify the target.
+    if ((!an || !an.target) && requestOptions.currentURL) {
+      const urlAnalysis = this.#analyzeURL(
+        requestOptions.currentURL,
+        requestOptions
+      );
+
+      if (urlAnalysis) {
+        console.debug(
+          `PatreonPageAnalyzer: identified target from URL fallback: ${requestOptions.currentURL}`
+        );
+
+        an = urlAnalysis;
+        bootstrapNotFound = false;
+      }
+    }
+
     if (bootstrapNotFound) {
       return {
         status: "bootstrapNotFound"
       };
-    }
-    return {
+    } return {
       status: "complete",
       normalizedURL: an?.normalizedURL || null,
       target: an?.target || null,
       tiers,
       campaignId
     };
+  }
+
+  static #getUrlPrefixes(destinationDir?: string): string[] {
+    const candidatePaths: string[] = [];
+
+    if (
+      destinationDir &&
+      typeof destinationDir === "string" &&
+      destinationDir.trim().length > 0
+    ) {
+      candidatePaths.push(path.join(destinationDir.trim(), ".patreon-dl", "custom-rules.json"));
+    }
+
+    try {
+      const userDataDir = app.getPath("userData");
+      candidatePaths.push(path.join(userDataDir, "custom-rules.json"));
+    } catch {
+      // Ignore if app.getPath is unavailable
+    }
+
+    for (const configPath of candidatePaths) {
+      try {
+        if (fs.existsSync(configPath)) {
+          const rawData = fs.readFileSync(configPath, "utf-8");
+          const parsed: CustomRules = JSON.parse(rawData);
+          if (
+            parsed &&
+            parsed.urlRules &&
+            Array.isArray(parsed.urlRules.stripPrefixes)
+          ) {
+            return Array.from(
+              new Set([...DEFAULT_PREFIXES, ...parsed.urlRules.stripPrefixes])
+            );
+          }
+        }
+      } catch (err) {
+        console.warn(
+          `[PatreonPageAnalyzer] Failed to read custom rules from ${configPath}:`,
+          err
+        );
+      }
+    }
+
+    return DEFAULT_PREFIXES;
+  }
+
+  /**
+   * Identifies the target from the URL of the page loaded in the browser view.
+   * This is a fallback for when the page data returned by Patreon does not
+   * contain the information needed to identify the target. It covers the same
+   * URL formats as `PAGE_PATHNAME_FORMATS`.
+   */
+  static #analyzeURL(
+    currentURL?: string,
+    options?: AnalyzerRequestOptions
+  ): PageAnalysis | null {
+    if (!currentURL) {
+      return null;
+    }
+    let url: URL;
+    try {
+      url = new URL(currentURL);
+    } catch (_error: unknown) {
+      console.warn(`PatreonPageAnalyzer: invalid URL "${currentURL}"`);
+      return null;
+    }
+    console.debug(`PatreonPageAnalyzer: analyzing URL "${currentURL}"`);
+
+    const segments = url.pathname
+      .split("/")
+      .filter((segment) => segment.length > 0)
+      .map((segment) => {
+        try {
+          return decodeURIComponent(segment);
+        } catch (_error: unknown) {
+          return segment;
+        }
+      });
+
+    const stripPrefixes = PatreonPageAnalyzer.#getUrlPrefixes(
+      options?.destinationDir
+    );
+    if (segments.length > 0 && stripPrefixes.includes(segments[0])) {
+      segments.shift();
+    }
+    const [first, second, third] = segments;
+
+    const __result = (
+      an: URLAnalysis,
+      normalizedURL: string
+    ): PageAnalysis => ({
+      normalizedURL,
+      target: {
+        ...an,
+        description: this.#getTargetDesc(an)
+      }
+    });
+
+    // /user/posts?u=[userId]
+    const userId = url.searchParams.get("u");
+    if (first === "user" && userId) {
+      return __result(
+        { type: "postsByUserId", userId },
+        `${PATREON_URL}/user/posts?u=${userId}`
+      );
+    }
+
+    // /posts/[postId]
+    if (first === "posts" && second) {
+      const { slug, id } = this.#parseSlugId(second);
+      if (id) {
+        return __result(
+          { type: "post", postId: id, slug: slug ?? undefined },
+          `${PATREON_URL}/posts/${second}`
+        );
+      }
+      return null;
+    }
+
+    // /collection/[collectionId]
+    if (first === "collection" && second) {
+      const { id } = this.#parseSlugId(second);
+      const collectionId = id || second;
+      return __result(
+        { type: "postsByCollection", collectionId },
+        `${PATREON_URL}/collection/${collectionId}`
+      );
+    }
+
+    if (!first || NON_VANITY_PATH_SEGMENTS.includes(first)) {
+      return null;
+    }
+
+    // /[vanity]/posts/[postId]
+    if (second === "posts" && third) {
+      const { slug, id } = this.#parseSlugId(third);
+      if (id) {
+        return __result(
+          { type: "post", postId: id, slug: slug ?? undefined },
+          `${PATREON_URL}/posts/${third}`
+        );
+      }
+      return null;
+    }
+
+    // /[vanity]/shop/[productId]
+    if (second === "shop" && third) {
+      const { slug, id } = this.#parseSlugId(third);
+      if (slug && id) {
+        return __result(
+          { type: "product", productId: id, slug },
+          `${PATREON_URL}/${first}/shop/${third}`
+        );
+      }
+      return null;
+    }
+
+    // /[vanity]/shop
+    if (second === "shop") {
+      return __result(
+        { type: "shop", vanity: first },
+        `${PATREON_URL}/${first}/shop`
+      );
+    }
+
+    // /[vanity]/[[...tab]]
+    return __result(
+      { type: "postsByUser", vanity: first },
+      `${PATREON_URL}/${first}/posts`
+    );
   }
 
   static async #getJSONWithPageBootstrap(
@@ -225,15 +448,6 @@ export default class PatreonPageAnalyzer {
   static #analyzePage(
     json: JSONWithPageBootstrap
   ): (PageAnalysis & { campaignId: string | null }) | null {
-    /**
-     * Perform our own analysis based on pageBootStrap,
-     * This gives more accurate result than patreon-dl's URLHelper.analyzeURL().
-     * Unfortunately, we can't perform the same analysis in patreon-dl
-     * because we don't have a browser there to capture pageBootstrap, and
-     * using fetch() to grab contents from URL will in most cases return
-     * a "Loading" page where code is then executed to provide the actual content,
-     * or otherwise a Google captcha challenge triggered by bot detection.
-     */
     const page = json.page;
     console.debug('PatreonPageAnalyzer: "page" value in bootstrap:', page);
     console.debug(
@@ -258,24 +472,6 @@ export default class PatreonPageAnalyzer {
       'PatreonPageAnalyzer: "campaign_id" value in bootstrap:',
       campaignId
     );
-
-    const __parseSlugId = (s: string) => {
-      // Check if ID only - no slug
-      if (!isNaN(Number(s))) {
-        return {
-          slug: null,
-          id: s
-        };
-      }
-      const match = /(.+)-(\d+)$/.exec(s);
-      if (match?.length === 3) {
-        return {
-          slug: match[1],
-          id: match[2]
-        };
-      }
-      return { slug: null, id: null };
-    };
 
     if (
       PAGE_PATHNAME_FORMATS.postsByUser.includes(page) &&
@@ -315,7 +511,7 @@ export default class PatreonPageAnalyzer {
       PAGE_PATHNAME_FORMATS.post.includes(page) &&
       typeof postId === "string"
     ) {
-      const { slug, id } = __parseSlugId(postId);
+      const { slug, id } = this.#parseSlugId(postId);
       if (id) {
         const an: URLAnalysis = {
           type: "post",
@@ -355,7 +551,7 @@ export default class PatreonPageAnalyzer {
       typeof vanity === "string" &&
       typeof productId === "string"
     ) {
-      const { slug, id } = __parseSlugId(productId);
+      const { slug, id } = this.#parseSlugId(productId);
       if (slug && id) {
         const an: URLAnalysis = {
           type: "product",
@@ -566,7 +762,7 @@ export default class PatreonPageAnalyzer {
         const incId =
           typeof inc === "object" && Reflect.has(inc, "id") ?
             String(inc.id)
-          : null;
+            : null;
         if (incId === id && Reflect.get(inc, "type") === "reward") {
           const attr = Reflect.get(inc, "attributes");
           if (typeof attr === "object") {
@@ -592,5 +788,23 @@ export default class PatreonPageAnalyzer {
       );
     }
     return null;
+  }
+
+  static #parseSlugId(s: string) {
+    // Check if ID only - no slug
+    if (!isNaN(Number(s))) {
+      return {
+        slug: null,
+        id: s
+      };
+    }
+    const match = /(.+)-(\d+)$/.exec(s);
+    if (match?.length === 3) {
+      return {
+        slug: match[1],
+        id: match[2]
+      };
+    }
+    return { slug: null, id: null };
   }
 }

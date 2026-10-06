@@ -32,12 +32,12 @@ interface WebBrowserViewEntry {
 
 export type ApplyProxyResult =
   | {
-      status: "success";
-    }
+    status: "success";
+  }
   | {
-      status: "error";
-      error: string;
-    };
+    status: "error";
+    error: string;
+  };
 
 export default class MainWindow extends BaseWindow {
   editorView: EditorView;
@@ -128,6 +128,9 @@ export default class MainWindow extends BaseWindow {
       editor.config.downloader.target.manualValue.trim() ||
       this.#initialWebBrowserProps.url;
     const newWebBrowserView = new WebBrowserView(partition);
+
+    newWebBrowserView.setDestinationDir(editor.config.output["out.dir"]);
+
     const newWebBrowserViewEntry: WebBrowserViewEntry = {
       navInfo: {
         url,
@@ -181,7 +184,7 @@ export default class MainWindow extends BaseWindow {
       (currentProxyURL === "" && proxyURL === "") ||
       (currentProxyURL === proxyURL &&
         editor.config.request["proxy.reject.unauthorized.tls"] ===
-          view?.proxy?.rejectUnauthorizedTLS)
+        view?.proxy?.rejectUnauthorizedTLS)
     ) {
       return;
     }
@@ -220,6 +223,7 @@ export default class MainWindow extends BaseWindow {
       return;
     }
     newActiveEntry.active = true;
+    newActiveEntry.view.setDestinationDir(editor?.config?.output?.["out.dir"]);
     this.emitWebBrowserViewEvent("pageNavigated", newActiveEntry.navInfo);
     if (currentActiveEntry) {
       currentActiveEntry.active = false;
@@ -315,8 +319,8 @@ export default class MainWindow extends BaseWindow {
       editorPanelWidth: this.#editorPanelWidth,
       state:
         this.isMaximized() ? "maximized"
-        : this.isMinimized() ? "minimized"
-        : "normal"
+          : this.isMinimized() ? "minimized"
+            : "normal"
     };
   }
 

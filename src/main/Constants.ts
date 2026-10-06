@@ -46,6 +46,10 @@ export const FILE_CONFIG_SECTION_PROPS = {
     "locked.content",
     "posts.in.tier",
     "posts.with.media.type",
+    "posts.title.regex",
+    "posts.excluded.collection.ids",
+    "posts.excluded.tags",
+    "posts.sort.order",
     "posts.published.after",
     "posts.published.before",
     "products.published.after",
@@ -65,6 +69,7 @@ export const FILE_CONFIG_SECTION_PROPS = {
   request: [
     "max.retries",
     "max.concurrent",
+    "max.concurrent.posts",
     "min.time",
     "proxy.url",
     "proxy.reject.unauthorized.tls",

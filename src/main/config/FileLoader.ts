@@ -685,6 +685,33 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
             ["image", "video", "audio", "attachment", "podcast"]
           )
       ),
+      "posts.title.regex": __fromFileConfigValue(
+        "include",
+        "posts.title.regex",
+        defaultConfig.include["posts.title.regex"],
+        toString
+      ),
+      "posts.excluded.collection.ids": __fromFileConfigValue(
+        "include",
+        "posts.excluded.collection.ids",
+        defaultConfig.include["posts.excluded.collection.ids"],
+        toString
+      ),
+      "posts.excluded.tags": __fromFileConfigValue(
+        "include",
+        "posts.excluded.tags",
+        defaultConfig.include["posts.excluded.tags"],
+        toString
+      ),
+      "posts.sort.order": __fromFileConfigValue(
+        "include",
+        "posts.sort.order",
+        defaultConfig.include["posts.sort.order"],
+        (value) => toOneOf<UIConfig["include"]["posts.sort.order"]>(
+          value,
+          ["newest", "oldest", "popular", "collection"]
+        )
+      ),
       "posts.published": __fromFileConfigValues(
         "include",
         ["posts.published.after", "posts.published.before"],
@@ -783,6 +810,12 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
         "request",
         "max.concurrent",
         defaultConfig.request["max.concurrent"],
+        toNumber
+      ),
+      "max.concurrent.posts": __fromFileConfigValue(
+        "request",
+        "max.concurrent.posts",
+        defaultConfig.request["max.concurrent.posts"],
         toNumber
       ),
       "min.time": __fromFileConfigValue(

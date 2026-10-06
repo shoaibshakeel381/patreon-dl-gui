@@ -129,6 +129,10 @@ function convertPatreonDLOptionsToUIConfig(
             []
           : p.include.postsWithMediaType
       },
+      "posts.title.regex": p.include.postsTitleRegex || "",
+      "posts.excluded.collection.ids": (p.include.postsExcludedCollectionIds || []).join(", "),
+      "posts.excluded.tags": (p.include.postsExcludedTags || []).join(", "),
+      "posts.sort.order": p.include.postsSortOrder,
       "posts.published": {
         type:
           postsPublishedAfter && postsPublishedBefore ? "between"
@@ -152,6 +156,7 @@ function convertPatreonDLOptionsToUIConfig(
     request: {
       "max.retries": p.request.maxRetries,
       "max.concurrent": p.request.maxConcurrent,
+      "max.concurrent.posts": p.request.maxConcurrentPosts ?? 1,
       "min.time": p.request.minTime,
       "proxy.url": p.request.proxy?.url ?? "",
       "proxy.reject.unauthorized.tls":

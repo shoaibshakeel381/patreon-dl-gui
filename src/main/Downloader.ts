@@ -89,6 +89,10 @@ export function convertUIConfigToPatreonDLOptions(
       postsWithMediaType: fromCustomSelectionValue(
         uiConfig.include["posts.with.media.type"]
       ),
+      postsTitleRegex: uiConfig.include["posts.title.regex"],
+      postsExcludedCollectionIds: uiConfig.include["posts.excluded.collection.ids"].split(",").map((id) => id.trim()).filter(Boolean),
+      postsExcludedTags: uiConfig.include["posts.excluded.tags"].split(",").map((tag) => tag.trim()).filter(Boolean),
+      postsSortOrder: uiConfig.include["posts.sort.order"],
       postsPublished: {
         after: toDateTime(fileConfig.include["posts.published.after"]),
         before: toDateTime(fileConfig.include["posts.published.before"])
@@ -102,6 +106,7 @@ export function convertUIConfigToPatreonDLOptions(
     request: {
       maxRetries: uiConfig.request["max.retries"],
       maxConcurrent: uiConfig.request["max.concurrent"],
+      maxConcurrentPosts: uiConfig.request["max.concurrent.posts"],
       minTime: uiConfig.request["min.time"],
       proxy:
         uiConfig.request["proxy.url"].trim() ?
