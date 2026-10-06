@@ -99,6 +99,7 @@ export interface UIConfig {
     "attachments.by.filename": string;
     "posts.title.regex": string;
     "posts.excluded.collection.ids": string;
+    "posts.excluded.tags": string;
     "posts.sort.order": "newest" | "oldest" | "popular" | "collection";
     "posts.in.tier": CustomSelectionValue<"any", string>;
     "posts.with.media.type": CustomSelectionValue<

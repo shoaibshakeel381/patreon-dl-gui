@@ -91,6 +91,7 @@ export function convertUIConfigToPatreonDLOptions(
       ),
       postsTitleRegex: uiConfig.include["posts.title.regex"],
       postsExcludedCollectionIds: uiConfig.include["posts.excluded.collection.ids"].split(",").map((id) => id.trim()).filter(Boolean),
+      postsExcludedTags: uiConfig.include["posts.excluded.tags"].split(",").map((tag) => tag.trim()).filter(Boolean),
       postsSortOrder: uiConfig.include["posts.sort.order"],
       postsPublished: {
         after: toDateTime(fileConfig.include["posts.published.after"]),

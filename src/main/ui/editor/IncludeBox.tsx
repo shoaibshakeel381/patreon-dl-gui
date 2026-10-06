@@ -496,6 +496,12 @@ function IncludeBox() {
               helpTooltip="Skip posts that belong to any listed collection. Enter collection IDs separated by commas. Leave blank to include posts from all collections."
               ariaLabel="Skip posts in these collections"
             />
+            <TextInputRow
+              config={["include", "posts.excluded.tags"]}
+              label="Skip tags"
+              helpTooltip="Skip posts with any listed tag. Enter tag names separated by commas. User-defined tags match the value after the semicolon in the API tag ID, with surrounding spaces trimmed."
+              ariaLabel="Skip posts with these tags"
+            />
             <Row className="py-1">
               <Col xs={4}>Published:</Col>
               <Col>

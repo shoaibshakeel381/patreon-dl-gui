@@ -697,6 +697,12 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
         defaultConfig.include["posts.excluded.collection.ids"],
         toString
       ),
+      "posts.excluded.tags": __fromFileConfigValue(
+        "include",
+        "posts.excluded.tags",
+        defaultConfig.include["posts.excluded.tags"],
+        toString
+      ),
       "posts.sort.order": __fromFileConfigValue(
         "include",
         "posts.sort.order",

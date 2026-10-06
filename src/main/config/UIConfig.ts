@@ -131,6 +131,7 @@ function convertPatreonDLOptionsToUIConfig(
       },
       "posts.title.regex": p.include.postsTitleRegex || "",
       "posts.excluded.collection.ids": (p.include.postsExcludedCollectionIds || []).join(", "),
+      "posts.excluded.tags": (p.include.postsExcludedTags || []).join(", "),
       "posts.sort.order": p.include.postsSortOrder,
       "posts.published": {
         type:

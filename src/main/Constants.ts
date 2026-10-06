@@ -48,6 +48,7 @@ export const FILE_CONFIG_SECTION_PROPS = {
     "posts.with.media.type",
     "posts.title.regex",
     "posts.excluded.collection.ids",
+    "posts.excluded.tags",
     "posts.sort.order",
     "posts.published.after",
     "posts.published.before",
