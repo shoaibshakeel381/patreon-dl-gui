@@ -366,6 +366,21 @@ export default class WebBrowserView extends WebContentsView {
         };
         break;
       }
+      case "postsByTag": {
+        bootstrapData = {
+          type: "post",
+          targetURL: analysis.normalizedURL || "",
+          postFetch: {
+            type: "byTag",
+            vanity: analysis.target.vanity,
+            userId: analysis.target.userId,
+            tag: analysis.target.tag,
+            filters: analysis.target.filters,
+            campaignId: analysis.campaignId || undefined
+          }
+        };
+        break;
+      }
       case "postsByUserId": {
         bootstrapData = {
           type: "post",

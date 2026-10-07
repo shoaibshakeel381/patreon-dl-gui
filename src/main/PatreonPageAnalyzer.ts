@@ -240,6 +240,40 @@ export default class PatreonPageAnalyzer {
       }
     }
 
+    // Patreon identifies tag-filtered creator pages as creator targets in its
+    // bootstrap data. Promote those pages to their own target type.
+    if (an?.target && requestOptions.currentURL) {
+      const urlFilters = this.#getURLFilters(requestOptions.currentURL);
+      if (typeof urlFilters.tag === "string" && urlFilters.tag.trim()) {
+        let hasTagTarget = false;
+        if (an.target.type === "postsByUser") {
+          an.target = {
+            type: "postsByTag",
+            vanity: an.target.vanity,
+            tag: urlFilters.tag,
+            filters: urlFilters,
+            description: `Posts tagged "${urlFilters.tag}" by "${an.target.vanity}"`
+          };
+          hasTagTarget = true;
+        } else if (an.target.type === "postsByUserId") {
+          an.target = {
+            type: "postsByTag",
+            userId: an.target.userId,
+            tag: urlFilters.tag,
+            filters: urlFilters,
+            description: `Posts tagged "${urlFilters.tag}"`
+          };
+          hasTagTarget = true;
+        }
+        if (hasTagTarget && an.normalizedURL) {
+          an.normalizedURL = this.#appendURLFilters(
+            an.normalizedURL,
+            urlFilters
+          );
+        }
+      }
+    }
+
     if (bootstrapNotFound) {
       return {
         status: "bootstrapNotFound"
@@ -251,6 +285,32 @@ export default class PatreonPageAnalyzer {
       tiers,
       campaignId
     };
+  }
+
+  static #getURLFilters(url: string): Record<string, string> {
+    const filters: Record<string, string> = {};
+    try {
+      for (const [key, value] of new URL(url).searchParams) {
+        const match = /^filters\[(.+)\]$/.exec(key);
+        if (match?.[1]) {
+          filters[match[1]] = value;
+        }
+      }
+    } catch {
+      // Ignore an invalid current URL; the analyzer handles target detection.
+    }
+    return filters;
+  }
+
+  static #appendURLFilters(
+    url: string,
+    filters: Record<string, string>
+  ): string {
+    const normalized = new URL(url);
+    for (const [key, value] of Object.entries(filters)) {
+      normalized.searchParams.set(`filters[${key}]`, value);
+    }
+    return normalized.toString();
   }
 
   static #getUrlPrefixes(destinationDir?: string): string[] {
@@ -721,6 +781,8 @@ export default class PatreonPageAnalyzer {
         return `Posts in collection #${target.collectionId}`;
       case "postsByUser":
         return `Posts by user "${target.vanity}"`;
+      case "postsByTag":
+        return `Posts tagged "${target.tag}"`;
       case "postsByUserId":
         return `Posts by user #${target.userId}`;
       case "product":
