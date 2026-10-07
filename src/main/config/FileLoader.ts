@@ -367,9 +367,10 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
 
   const __getFileConfigValue = <S extends FileConfigSection>(
     section: S,
-    prop: FileConfigProp<S>
+    prop: FileConfigProp<S>,
+    raw = false
   ) => {
-    const v = parser.get(section, prop);
+    const v = parser.get(section, prop, raw);
     return __stripQuotes(v);
   };
 
@@ -377,9 +378,10 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
     section: S,
     prop: FileConfigProp<S>,
     defaultValue: V,
-    parseFn: (value: string) => ParseValueResult<V>
+    parseFn: (value: string) => ParseValueResult<V>,
+    raw = false
   ) => {
-    const fv = __getFileConfigValue(section, prop);
+    const fv = __getFileConfigValue(section, prop, raw);
     if (!fv) {
       return defaultValue;
     }
@@ -839,14 +841,15 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
     },
     "embed.downloader.youtube": {
       type:
-        __getFileConfigValue("embed.downloader.youtube", "exec") ? "custom" : (
+        __getFileConfigValue("embed.downloader.youtube", "exec", true) ? "custom" : (
           "default"
         ),
       exec: __fromFileConfigValue(
         "embed.downloader.youtube",
         "exec",
         defaultConfig["embed.downloader.youtube"]["exec"],
-        toString
+        toString,
+        true
       )
     },
     "embed.downloader.vimeo": {
@@ -1078,7 +1081,7 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
     .map((s) => s.substring(embedDownloaderPrefix.length))
     .filter((s) => s && !handledEmbedDownloaders.includes(s))
     .map((provider) => {
-      const exec = __stripQuotes(parser.get(`${embedDownloaderPrefix}${provider}`, "exec")) ?? '';
+      const exec = __stripQuotes(parser.get(`${embedDownloaderPrefix}${provider}`, "exec", true)) ?? '';
       return { provider, exec };
     });
 

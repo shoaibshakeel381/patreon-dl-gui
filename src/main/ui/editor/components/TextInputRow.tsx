@@ -14,7 +14,7 @@ import _ from "lodash";
 type InputValueType = "text" | "number" | "dir" | "file" | "any";
 type ConfigValueType<T extends InputValueType> =
   T extends "number" ? number
-  : T extends "any" ? any
+  : T extends "any" ? any // eslint-disable-line @typescript-eslint/no-explicit-any
   : string;
 
 type TextInputRowProps<
@@ -35,7 +35,7 @@ type TextInputRowProps<
       inputValue: string
     ) => ConfigValueType<T>;
   }
-: {}) &
+: Record<never, never>) &
   HelpProps &
   AccessibilityProps;
 

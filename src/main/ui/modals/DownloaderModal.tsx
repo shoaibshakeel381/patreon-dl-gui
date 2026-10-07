@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import type { JSX } from "react";
 import { Button, Modal } from "react-bootstrap";
 import ReactDOMServer from "react-dom/server";
+import { showToast } from "../helpers/Toast";
 
 const MAX_MESSAGES = 1000;
 
@@ -34,6 +35,28 @@ type ContentValue<T extends ContentType> =
 interface ContentsScrollParams {
   autoScroll: boolean;
   ignoreNextScroll: boolean;
+}
+
+function redactSensitiveText(text: string) {
+  const secretKeys =
+    "cookie|set-cookie|authorization|proxy-authorization|access[_-]?token|refresh[_-]?token|id[_-]?token|password|passwd|secret|api[_-]?key";
+  return text
+    .replace(
+      new RegExp(`([\\"']?(?:${secretKeys})[\\"']?\\s*[:=]\\s*)([\\"'])(.*?)\\2`, "gi"),
+      "$1$2PRIVATE$2"
+    )
+    .replace(
+      new RegExp(`(^\\s*(?:cookie|set-cookie)\\s*[:=]\\s*).+$`, "gim"),
+      "$1PRIVATE"
+    )
+    .replace(
+      /(^|\s)(--(?:video-)?(?:password|cookie|token)|--api-key)(?:=|\s+)(?:"[^"]*"|'[^']*'|[^\s]+)/gi,
+      "$1$2 PRIVATE"
+    )
+    .replace(
+      new RegExp(`(\\b(?:${secretKeys})\\b\\s*[:=]\\s*)[^\\s,;}\\]]+`, "gi"),
+      "$1PRIVATE"
+    );
 }
 
 function DownloaderModal() {
@@ -130,6 +153,15 @@ function DownloaderModal() {
   const clearMessages = useCallback(() => {
     updateContents("string", "");
   }, [updateContents]);
+
+  const copyMessages = useCallback(() => {
+    flushContentsBuffer();
+    const contents = contentsElRef.current?.innerText;
+    if (contents !== undefined) {
+      navigator.clipboard.writeText(redactSensitiveText(contents));
+      showToast("success", "Console log copied to clipboard");
+    }
+  }, [flushContentsBuffer]);
 
   const wrapText = useCallback(() => {
     const contentsEl = contentsElRef.current;
@@ -286,6 +318,21 @@ function DownloaderModal() {
           size="sm"
           variant="dark"
           className="rounded me-2"
+          title="Copy messages"
+          onClick={copyMessages}
+          aria-label="Copy messages"
+        >
+          <span
+            className="material-symbols-outlined"
+            style={{ lineHeight: "inherit" }}
+          >
+            content_copy
+          </span>
+        </Button>
+        <Button
+          size="sm"
+          variant="dark"
+          className="rounded me-2"
           title="Clear messages"
           onClick={clearMessages}
           aria-label="Clear messages"
@@ -299,7 +346,7 @@ function DownloaderModal() {
         </Button>
       </>
     );
-  }, [state]);
+  }, [state, wrapText, clearMessages, copyMessages]);
 
   const footerButtons = useMemo(() => {
     if (!state) {
