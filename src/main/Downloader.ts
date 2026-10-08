@@ -18,7 +18,9 @@ import {
   SPROUTVIDEO_HELPER_SCRIPT_EXEC_ARGS,
   SPROUTVIDEO_HELPER_SCRIPT_PATH,
   VIMEO_HELPER_SCRIPT_EXEC_ARGS,
-  VIMEO_HELPER_SCRIPT_PATH
+  VIMEO_HELPER_SCRIPT_PATH,
+  STREAMABLE_HELPER_SCRIPT_EXEC_ARGS,
+  STREAMABLE_HELPER_SCRIPT_PATH,
 } from "./Constants";
 import { Shescape } from "shescape";
 import { getErrorString } from "../common/util/Misc";
@@ -152,6 +154,17 @@ export function convertUIConfigToPatreonDLOptions(
       exec: uiConfig["embed.downloader.sproutvideo"].exec.trim()
     });
   }
+  if (uiConfig["embed.downloader.streamable"].type === "helper") {
+    embedDownloaders.push({
+      provider: "streamable",
+      exec: getStreamableHelperExec(uiConfig["embed.downloader.streamable"])
+    });
+  } else if (uiConfig["embed.downloader.streamable"].exec.trim()) {
+    embedDownloaders.push({
+      provider: "streamable",
+      exec: uiConfig["embed.downloader.streamable"].exec.trim()
+    });
+  }
   if (embedDownloaders.length > 0) {
     downloaderOptions.embedDownloaders = embedDownloaders;
   }
@@ -244,9 +257,16 @@ function getSproutVideoHelperExec(
   return [shescape.quote(SPROUTVIDEO_HELPER_SCRIPT_PATH), ...args].join(" ");
 }
 
+function getStreamableHelperExec(
+  config: UIConfig["embed.downloader.streamable"]
+) {
+  const args = getYtdlpArgs(STREAMABLE_HELPER_SCRIPT_EXEC_ARGS, config);
+  return [shescape.quote(STREAMABLE_HELPER_SCRIPT_PATH), ...args].join(" ");
+}
+
 function getYtdlpArgs(
   baseArgs: string[],
-  config: UIConfig["embed.downloader.vimeo" | "embed.downloader.sproutvideo"]
+  config: UIConfig["embed.downloader.vimeo" | "embed.downloader.sproutvideo" | "embed.downloader.streamable"]
 ) {
   const args = [...baseArgs];
   if (config["helper.ytdlp.path"].trim()) {
