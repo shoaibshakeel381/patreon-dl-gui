@@ -156,6 +156,17 @@ function toNumber(value: string): ParseValueResult<number> {
   };
 }
 
+function toNonNegativeNumber(value: string): ParseValueResult<number> {
+  const parsed = toNumber(value);
+  if (parsed.hasError) {
+    return parsed;
+  }
+  return {
+    ...parsed,
+    result: Math.abs(parsed.result)
+  };
+}
+
 function toString(value: string): ParseValueResult<string> {
   return {
     result: value,
@@ -493,6 +504,12 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
         "max.video.resolution",
         defaultConfig.downloader["max.video.resolution"],
         toMaxVideoResolution
+      ),
+      "min.video.duration": __fromFileConfigValue(
+        "downloader",
+        "min.video.duration",
+        defaultConfig.downloader["min.video.duration"],
+        toNonNegativeNumber
       ),
       "use.status.cache": __fromFileConfigValue(
         "downloader",

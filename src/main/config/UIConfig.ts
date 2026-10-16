@@ -71,6 +71,7 @@ function convertPatreonDLOptionsToUIConfig(
       "path.to.ffmpeg": p.pathToFFmpeg || "",
       "path.to.deno": p.pathToDeno || "",
       "max.video.resolution": maxVideoResolution,
+      "min.video.duration": p.minVideoDuration,
       "use.status.cache": p.useStatusCache,
       "stop.on": stopOn,
       "no.prompt": false,

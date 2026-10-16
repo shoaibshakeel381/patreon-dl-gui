@@ -31,7 +31,8 @@ export const FILE_CONFIG_SECTION_PROPS = {
     "dry.run",
     "path.to.ffmpeg",
     "path.to.deno",
-    "max.video.resolution"
+    "max.video.resolution",
+    "min.video.duration"
   ],
   output: [
     "out.dir",

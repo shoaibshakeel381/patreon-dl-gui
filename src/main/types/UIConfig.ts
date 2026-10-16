@@ -65,6 +65,7 @@ export interface UIConfig {
     "path.to.ffmpeg": string;
     "path.to.deno": string;
     "max.video.resolution": MaxVideoResolution;
+    "min.video.duration": number;
     "use.status.cache": boolean;
     "stop.on": Exclude<
       StopOnCondition,

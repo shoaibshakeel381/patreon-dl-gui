@@ -491,6 +491,14 @@ function IncludeBox() {
               ariaLabel="Skip posts matching title regular expression"
             />
             <TextInputRow
+              type="number"
+              config={["downloader", "min.video.duration"]}
+              label="Skip videos shorter than (seconds)"
+              helpTooltip="Skip video posts shorter than this duration. The downloader checks post data first and checks HLS playlists before downloading fragments when duration is unavailable. Set to 0 to disable."
+              ariaLabel="Minimum video duration in seconds"
+              onChange={(e) => setConfigValue("downloader", "min.video.duration", Math.abs(Number(e.currentTarget.value)))}
+            />
+            <TextInputRow
               config={["include", "posts.excluded.collection.ids"]}
               label="Skip collection IDs"
               helpTooltip="Skip posts that belong to any listed collection. Enter collection IDs separated by commas. Leave blank to include posts from all collections."

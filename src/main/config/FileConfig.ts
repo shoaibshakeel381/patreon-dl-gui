@@ -80,7 +80,8 @@ export function convertUIConfigToFileContents(
       "dry.run": booleanToString(config.downloader["dry.run"]),
       "path.to.ffmpeg": config.downloader["path.to.ffmpeg"].trim(),
       "path.to.deno": config.downloader["path.to.deno"].trim(),
-      "max.video.resolution": maxVideoResolution
+      "max.video.resolution": maxVideoResolution,
+      "min.video.duration": numberToString(config.downloader["min.video.duration"])
     },
     output: {
       "out.dir": config.output["out.dir"].trim(),

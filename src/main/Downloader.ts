@@ -57,6 +57,7 @@ export function convertUIConfigToPatreonDLOptions(
     maxVideoResolution: getMaxVideoResolutionValue(
       uiConfig.downloader["max.video.resolution"]
     ),
+    minVideoDuration: uiConfig.downloader["min.video.duration"],
     useStatusCache: uiConfig.downloader["use.status.cache"],
     stopOn: uiConfig.downloader["stop.on"],
     dryRun: uiConfig.downloader["dry.run"],
