@@ -496,7 +496,10 @@ function IncludeBox() {
               label="Skip videos shorter than (seconds)"
               helpTooltip="Skip video posts shorter than this duration. The downloader checks post data first and checks HLS playlists before downloading fragments when duration is unavailable. Set to 0 to disable."
               ariaLabel="Minimum video duration in seconds"
-              onChange={(e) => setConfigValue("downloader", "min.video.duration", Math.abs(Number(e.currentTarget.value)))}
+              normalizeInputValue={(value) => {
+                const duration = Number(value);
+                return Number.isFinite(duration) ? String(Math.abs(duration)) : "0";
+              }}
             />
             <TextInputRow
               config={["include", "posts.excluded.collection.ids"]}

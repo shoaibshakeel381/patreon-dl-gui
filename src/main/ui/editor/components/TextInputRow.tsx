@@ -25,6 +25,7 @@ type TextInputRowProps<
   type?: T;
   config: UIConfigSectionPropTuple<S, ConfigValueType<T>>;
   label: string;
+  normalizeInputValue?: (value: string) => string;
   insertables?: { value: string; label: string }[];
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 } & (T extends "any" ?
@@ -49,6 +50,7 @@ function TextInputRow<
     type = "text",
     config: target,
     label,
+    normalizeInputValue,
     insertables,
     ariaLabel,
     onChange
@@ -86,12 +88,12 @@ function TextInputRow<
 
   const handleValueChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      _setConfigValue(e.currentTarget.value);
+      _setConfigValue(normalizeInputValue?.(e.currentTarget.value) ?? e.currentTarget.value);
       if (onChange) {
         onChange(e);
       }
     },
-    [_setConfigValue, onChange]
+    [_setConfigValue, normalizeInputValue, onChange]
   );
 
   const textbox = (

@@ -139,6 +139,7 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
     #getDisplayConfig(config: ReturnType<PatreonDownloader<any>["getConfig"]>) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const displayConfig = _.cloneDeep(config) as any;
+      displayConfig.minVideoDuration = config.minVideoDuration ?? 0;
       delete displayConfig.type;
       delete displayConfig.postFetch;
       delete displayConfig.productId;
