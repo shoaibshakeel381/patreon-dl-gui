@@ -183,6 +183,7 @@ export interface UIConfig {
   };
   "patreon.dl.gui": {
     "connect.youtube": boolean;
+    "trust.cache": boolean;
   };
   "support.data": {
     browserObtainedValues: {

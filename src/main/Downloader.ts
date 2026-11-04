@@ -59,6 +59,7 @@ export function convertUIConfigToPatreonDLOptions(
     ),
     minVideoDuration: uiConfig.downloader["min.video.duration"],
     useStatusCache: uiConfig.downloader["use.status.cache"],
+    trustCache: uiConfig["patreon.dl.gui"]["trust.cache"],
     stopOn: uiConfig.downloader["stop.on"],
     dryRun: uiConfig.downloader["dry.run"],
     outDir: fileConfig.output["out.dir"],

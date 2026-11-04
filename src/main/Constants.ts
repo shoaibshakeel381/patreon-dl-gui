@@ -105,6 +105,7 @@ export const FILE_CONFIG_SECTION_PROPS = {
   ],
   "patreon.dl.gui": [
     "connect.youtube",
+    "trust.cache",
     "vimeo.downloader.type",
     "vimeo.helper.ytdlp.path",
     "vimeo.helper.password",

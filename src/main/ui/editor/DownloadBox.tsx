@@ -14,6 +14,7 @@ interface DownloadBoxState {
   outDir: string;
   cookie: UIConfig["downloader"]["cookie"];
   useStatusCache: boolean;
+  trustCache: boolean;
   stopOn: StopOnCondition;
 }
 
@@ -25,6 +26,7 @@ function getDownloadBoxState(config: UIConfig): DownloadBoxState {
     outDir: config.output["out.dir"],
     cookie: config.downloader.cookie,
     useStatusCache: config.downloader["use.status.cache"],
+    trustCache: config["patreon.dl.gui"]["trust.cache"],
     stopOn: config.downloader["stop.on"]
   };
   if (oldState && _.isEqual(oldState, state)) {
@@ -67,6 +69,12 @@ function DownloadBox() {
               config={["downloader", "use.status.cache"]}
               label="Use status cache"
               helpTooltip="Use status cache to quickly skip previously downloaded items."
+              helpHasMoreInfo
+            />
+            <CheckboxRow
+              config={["patreon.dl.gui", "trust.cache"]}
+              label="Trust cache"
+              helpTooltip="Skip posts with successful status-cache entries without checking whether their files exist."
               helpHasMoreInfo
             />
             <SelectRow

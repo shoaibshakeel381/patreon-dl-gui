@@ -1104,6 +1104,12 @@ export function loadUIConfigFromFile(filePath: string): LoadFileResult {
         "connect.youtube",
         false,
         toBoolean
+      ),
+      "trust.cache": __fromFileConfigValue(
+        "patreon.dl.gui",
+        "trust.cache",
+        defaultConfig["patreon.dl.gui"]["trust.cache"],
+        toBoolean
       )
     },
     "support.data": {

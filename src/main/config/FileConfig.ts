@@ -200,6 +200,9 @@ export function convertUIConfigToFileContents(
       "connect.youtube": booleanToString(
         config["patreon.dl.gui"]["connect.youtube"]
       ),
+      "trust.cache": booleanToString(
+        config["patreon.dl.gui"]["trust.cache"]
+      ),
       "vimeo.downloader.type": config["embed.downloader.vimeo"].type,
       "vimeo.helper.ytdlp.path":
         config["embed.downloader.vimeo"]["helper.ytdlp.path"].trim() || "",

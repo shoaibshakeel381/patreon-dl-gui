@@ -215,7 +215,8 @@ function convertPatreonDLOptionsToUIConfig(
       color: fileLoggerOptions.color
     },
     "patreon.dl.gui": {
-      "connect.youtube": false
+      "connect.youtube": false,
+      "trust.cache": p.trustCache
     },
     "support.data": {
       browserObtainedValues: {
