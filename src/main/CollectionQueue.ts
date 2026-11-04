@@ -1,5 +1,6 @@
 export interface CollectionQueueOptions {
   starts: string[];
+  reverseDownloadOrder: boolean;
   signal: AbortSignal;
   fetchPage: (url: string) => Promise<{ ids: string[]; next: string | null }>;
   download: (id: string, index: number, total: number) => Promise<void>;
@@ -9,7 +10,7 @@ export interface CollectionQueueOptions {
 }
 
 export async function runCollectionQueue(options: CollectionQueueOptions): Promise<void> {
-  const { starts, signal, fetchPage, download, wait, onFailure, isFatal } = options;
+  const { starts, reverseDownloadOrder, signal, fetchPage, download, wait, onFailure, isFatal } = options;
   const ids = new Set<string>();
   const visited = new Set<string>();
   let requested = false;
@@ -28,7 +29,9 @@ export async function runCollectionQueue(options: CollectionQueueOptions): Promi
     }
   }
   let index = 0;
-  for (const id of ids) {
+  const downloadIds = [...ids];
+  if (reverseDownloadOrder) downloadIds.reverse();
+  for (const id of downloadIds) {
     signal.throwIfAborted();
     if (requested || index) await wait();
     signal.throwIfAborted();

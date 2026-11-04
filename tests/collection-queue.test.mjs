@@ -6,7 +6,7 @@ test('discovers all pages, deduplicates, then downloads sequentially with delays
   const events = [];
   const pages = { main: { ids: ['1', '2'], next: 'next' }, next: { ids: ['2', '3'], next: null }, shows: { ids: ['3', '4'], next: null } };
   await runCollectionQueue({
-    starts: ['main', 'shows'], signal: new AbortController().signal,
+    starts: ['main', 'shows'], reverseDownloadOrder: false, signal: new AbortController().signal,
     fetchPage: async url => { events.push(`fetch:${url}`); return pages[url]; },
     download: async id => { events.push(`download:${id}`); },
     wait: async () => { events.push('wait'); }
@@ -16,7 +16,7 @@ test('discovers all pages, deduplicates, then downloads sequentially with delays
 
 test('continues after a collection fails and reports it', async () => {
   const events = [];
-  await runCollectionQueue({ starts: ['main'], signal: new AbortController().signal,
+  await runCollectionQueue({ starts: ['main'], reverseDownloadOrder: false, signal: new AbortController().signal,
     fetchPage: async () => ({ ids: ['1', '2'], next: null }),
     wait: async () => {},
     download: async id => { events.push(id); if (id === '1') throw Error('failed'); },
@@ -25,11 +25,21 @@ test('continues after a collection fails and reports it', async () => {
   assert.deepEqual(events, ['1', 'failed:1', '2']);
 });
 
+test('reverses download order when requested while preserving discovery order otherwise', async () => {
+  const downloaded = [];
+  await runCollectionQueue({ starts: ['main'], reverseDownloadOrder: true,
+    signal: new AbortController().signal,
+    fetchPage: async () => ({ ids: ['1', '2', '3'], next: null }),
+    wait: async () => {}, download: async id => downloaded.push(id)
+  });
+  assert.deepEqual(downloaded, ['3', '2', '1']);
+});
+
 test('stops before the next collection when cancelled during the delay', async () => {
   const controller = new AbortController();
   const downloaded = [];
   let waits = 0;
-  await assert.rejects(runCollectionQueue({ starts: ['main'], signal: controller.signal,
+  await assert.rejects(runCollectionQueue({ starts: ['main'], reverseDownloadOrder: false, signal: controller.signal,
     fetchPage: async () => ({ ids: ['1', '2'], next: null }),
     wait: async () => { if (++waits === 2) controller.abort(); },
     download: async id => downloaded.push(id)

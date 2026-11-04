@@ -273,7 +273,9 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
           const failures: string[] = [];
           log("Discovering creator collections...");
           await runCollectionQueue({
-            starts: [makeURL(false), makeURL(true)], signal,
+            starts: [makeURL(false), makeURL(true)],
+            reverseDownloadOrder: collections.options.include.postsSortOrder === "oldest",
+            signal,
             wait: () => delay(2000, undefined, { signal }),
             fetchPage: async (url) => {
               const parsed = new URL(url);
