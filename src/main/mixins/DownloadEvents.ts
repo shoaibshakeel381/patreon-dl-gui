@@ -6,6 +6,10 @@ import ObjectHelper from "../util/ObjectHelper";
 import { dialog } from "electron";
 import _ from "lodash";
 import { getErrorString } from "../../common/util/Misc";
+import { runCollectionQueue } from "../CollectionQueue";
+import { setTimeout as delay } from "node:timers/promises";
+import { encode } from "html-entities";
+import type WebBrowserView from "../views/browser/WebBrowserView";
 
 export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
   Base: TBase
@@ -41,6 +45,12 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
                 } = convertUIConfigToPatreonDLOptions(editor.config, {
                   userAgent: this.resolvedUserAgent
                 });
+                const collectionsURL = /^https:\/\/www\.patreon\.com\/(?:c\/|cw\/)?[^/]+\/collections\/?(?:[?#].*)?$/.test(targetURL);
+                const browser = this.win.webBrowserView;
+                const collectionsPage = collectionsURL ? browser?.collectionsPage : null;
+                if (collectionsURL && (!collectionsPage || collectionsPage.url !== targetURL)) {
+                  throw new Error("Open the creator collections page in the browser and wait for it to load.");
+                }
                 if (bootstrapData) {
                   console.debug(
                     "DownloadEvent: instantiating PatreonDownloader with bootstrapData:",
@@ -54,7 +64,11 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
                 }
                 this.downloader = {
                   instance: await PatreonDownloader.getInstance(
-                    bootstrapData || targetURL,
+                    collectionsPage ? {
+                      type: "post",
+                      targetURL,
+                      postFetch: { type: "byUser", campaignId: collectionsPage.campaignId, vanity: new URL(targetURL).pathname.split('/').filter(Boolean).at(-2)! }
+                    } : bootstrapData || targetURL,
                     downloaderOptions
                   ),
                   consoleLogger,
@@ -83,7 +97,7 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
                   "confirmStartDownload",
                   async (result) => {
                     if (result.confirmed) {
-                      await this.#startDownloader();
+                      await this.#startDownloader(collectionsPage && browser ? { campaignId: collectionsPage.campaignId, browser, options: downloaderOptions, maxRetries: editor.config.request["max.retries"] } : undefined);
                     } else {
                       this.downloader = null;
                     }
@@ -201,7 +215,12 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
       }
     }
 
-    async #startDownloader() {
+    async #startDownloader(collections?: {
+      campaignId: string;
+      browser: WebBrowserView;
+      options: Parameters<typeof PatreonDownloader.getInstance>[1];
+      maxRetries: number;
+    }) {
       if (!this.#checkDownloaderExists(this.downloader)) {
         return;
       }
@@ -215,9 +234,59 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
         });
         this.downloader.status = "running";
         this.emitRendererEvent(this.win.modalView, "downloaderStart");
-        await this.downloader.instance.start({
-          signal: this.downloader.abortController.signal
-        });
+        const bundle = this.downloader;
+        const signal = bundle.abortController.signal;
+        if (collections) {
+          const log = (text: string, level: "info" | "error" = "info") =>
+            this.emitRendererEvent(this.win.modalView, "downloaderLogMessage", { text: encode(text), level });
+          const makeURL = (show: boolean) => {
+            const url = new URL("https://www.patreon.com/api/collection");
+            url.searchParams.set("filter[campaign_id]", collections.campaignId);
+            url.searchParams.set("filter[must_contain_at_least_one_published_post]", "true");
+            url.searchParams.set("fields[collection]", "title,collection_id");
+            url.searchParams.set("json-api-version", "1.0");
+            url.searchParams.set("json-api-use-default-includes", "false");
+            if (show) url.searchParams.set("filter[collection_type]", "show");
+            else url.searchParams.set("sort", "-edited_at");
+            return url.toString();
+          };
+          const failures: string[] = [];
+          log("Discovering creator collections...");
+          await runCollectionQueue({
+            starts: [makeURL(false), makeURL(true)], signal,
+            wait: () => delay(2000, undefined, { signal }),
+            fetchPage: async (url) => {
+              const parsed = new URL(url);
+              if (parsed.origin !== "https://www.patreon.com" || parsed.pathname !== "/api/collection") throw new Error("Invalid collection pagination URL");
+              let response: Response | undefined;
+              for (let attempt = 0; attempt <= collections.maxRetries; attempt++) {
+                response = await collections.browser.webContents.session.fetch(url, { signal, credentials: "include" });
+                if (response.status !== 429 || attempt === collections.maxRetries) break;
+                const retry = response.headers.get("retry-after");
+                const seconds = retry ? Number(retry) : NaN;
+                const millis = Number.isFinite(seconds) ? seconds * 1000 : retry ? Date.parse(retry) - Date.now() : 0;
+                await delay(Math.max(2000, millis || 0), undefined, { signal });
+              }
+              if (!response?.ok) throw new Error(`Collection discovery failed (HTTP ${response?.status ?? "unknown"})`);
+              const json = await response.json() as { data?: { id?: unknown }[]; links?: { next?: unknown } };
+              if (!Array.isArray(json.data) || json.data.some(item => typeof item.id !== "string" || !/^\d+$/.test(item.id))) throw new Error("Invalid collection list response");
+              if (json.links?.next != null && typeof json.links.next !== "string") throw new Error("Invalid collection pagination link");
+              log(`Discovered ${json.data.length} collections in this page.`);
+              return { ids: json.data.map(item => item.id as string), next: json.links?.next as string | null ?? null };
+            },
+            download: async (id, index, total) => {
+              log(`Downloading collection ${index + 1} of ${total}: #${id}`);
+              bundle.instance = await PatreonDownloader.getInstance(`https://www.patreon.com/collection/${id}`, collections.options);
+              await bundle.instance.start({ signal });
+            },
+            onFailure: (id, error) => { failures.push(id); log(`Collection #${id} failed: ${getErrorString(error)}`, "error"); },
+            isFatal: error => /\b(401|403)\b/.test(getErrorString(error))
+          });
+          if (failures.length) throw new Error(`Failed collections: ${failures.join(", ")}`);
+          log("Collection queue complete.");
+        } else {
+          await bundle.instance.start({ signal });
+        }
         this.downloader.status = "end";
         if (this.downloader.abortController.signal.aborted) {
           this.emitRendererEvent(this.win.modalView, "downloaderEnd", {
@@ -232,10 +301,11 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
         });
       } catch (error: unknown) {
         this.downloader.status = "end";
-        this.emitRendererEvent(this.win.modalView, "downloaderEnd", {
-          hasError: true,
-          error: getErrorString(error)
-        });
+        if (this.downloader.abortController.signal.aborted) {
+          this.emitRendererEvent(this.win.modalView, "downloaderEnd", { hasError: false, aborted: true });
+        } else {
+          this.emitRendererEvent(this.win.modalView, "downloaderEnd", { hasError: true, error: getErrorString(error) });
+        }
       } finally {
         this.downloader.consoleLogger.removeAllListeners();
         this.downloader = null;

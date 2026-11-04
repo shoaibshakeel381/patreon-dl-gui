@@ -23,6 +23,12 @@ export default class WebBrowserView extends WebContentsView {
     rejectUnauthorizedTLS: boolean;
   } | null;
   #destinationDir: string | null = null;
+  #collectionsPage: { url: string; campaignId: string } | null = null;
+
+  get collectionsPage() {
+    return this.#collectionsPage?.url === this.webContents.getURL()
+      ? this.#collectionsPage : null;
+  }
 
   constructor(partition?: string) {
     super({
@@ -338,6 +344,10 @@ export default class WebBrowserView extends WebContentsView {
     analysis: PatreonPageAnalysis & { status: "complete" },
     cookie: string
   ) {
+    const currentURL = this.webContents.getURL();
+    const isCollectionsPage = /^https:\/\/www\.patreon\.com\/(?:c\/|cw\/)?[^/]+\/collections\/?(?:[?#].*)?$/.test(currentURL);
+    this.#collectionsPage = isCollectionsPage && analysis.campaignId
+      ? { url: currentURL, campaignId: analysis.campaignId } : null;
     let bootstrapData:
       | PostDownloaderBootstrapData
       | ProductDownloaderBootstrapData
@@ -436,9 +446,9 @@ export default class WebBrowserView extends WebContentsView {
     console.debug("WebBrowserView: bootstrapData:", bootstrapData);
 
     this.emitWebBrowserViewEvent("pageInfo", {
-      url: analysis.normalizedURL || null,
+      url: isCollectionsPage ? currentURL : analysis.normalizedURL || null,
       title: this.webContents.getTitle(),
-      pageDescription: analysis.target?.description || "No target identified",
+      pageDescription: isCollectionsPage ? "All creator collections" : analysis.target?.description || "No target identified",
       cookie,
       cookieDescription: cookie || "No cookie found",
       tiers: analysis.tiers || null,
