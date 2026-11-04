@@ -27,6 +27,7 @@ export type MainProcessInvocableMethod =
   | "webBrowserReload"
   | "startDownload"
   | "abortDownload"
+  | "openDownloadFolder"
   | "configureYouTube"
   | "startYouTubeConnect"
   | "cancelYouTubeConnect"
@@ -62,6 +63,7 @@ export type MainProcessInvocableMethodHandler<
   : M extends "webBrowserReload" ? () => void
   : M extends "startDownload" ? (editor: Editor) => void
   : M extends "abortDownload" ? () => void
+  : M extends "openDownloadFolder" ? () => Promise<void>
   : M extends "configureYouTube" ? () => void
   : M extends "startYouTubeConnect" ? () => void
   : M extends "cancelYouTubeConnect" ? () => void

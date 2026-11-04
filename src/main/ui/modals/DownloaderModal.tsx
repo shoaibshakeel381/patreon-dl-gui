@@ -62,6 +62,7 @@ function redactSensitiveText(text: string) {
 function DownloaderModal() {
   const [state, setState] = useState<DownloaderState | null>(null);
   const [show, setShow] = useState(false);
+  const [destinationPath, setDestinationPath] = useState<string | null>(null);
   const contentsBufferRef = useRef("");
   const contentsFlushTimerRef = useRef<NodeJS.Timeout>(null);
   const contentsElRef = useRef<HTMLDivElement>(null);
@@ -222,10 +223,14 @@ function DownloaderModal() {
       }),
       window.mainAPI.on("downloaderStart", () => {
         contentsScrollParamsRef.current.autoScroll = true;
+        setDestinationPath(null);
         setState({
           status: "running"
         });
         setShow(true);
+      }),
+      window.mainAPI.on("downloaderDestination", (path) => {
+        setDestinationPath(path);
       }),
       window.mainAPI.on("downloaderEnd", (info) => {
         clearContentsFlushTimer();
@@ -379,13 +384,24 @@ function DownloaderModal() {
         );
       case "running":
         return (
-          <Button
-            variant="danger"
-            onClick={abortDownload}
-            aria-label="Abort download"
-          >
-            Abort
-          </Button>
+          <div className="d-flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => void window.mainAPI.invoke("openDownloadFolder")}
+              disabled={!destinationPath}
+              aria-label="Open creator destination folder"
+              title={destinationPath ?? "Destination folder is not available yet"}
+            >
+              Open folder
+            </Button>
+            <Button
+              variant="danger"
+              onClick={abortDownload}
+              aria-label="Abort download"
+            >
+              Abort
+            </Button>
+          </div>
         );
       case "end":
         return (

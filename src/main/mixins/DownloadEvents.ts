@@ -3,7 +3,7 @@ import { convertUIConfigToPatreonDLOptions } from "../Downloader";
 import type { DownloaderBundle, MainProcessConstructor } from "../MainProcess";
 import type { Editor } from "../types/App";
 import ObjectHelper from "../util/ObjectHelper";
-import { dialog } from "electron";
+import { dialog, shell } from "electron";
 import _ from "lodash";
 import { getErrorString } from "../../common/util/Misc";
 import { runCollectionQueue } from "../CollectionQueue";
@@ -16,6 +16,7 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
 ) {
   return class DownloadEventSupportedProcess extends Base {
     #showDenoMissingWarning = true;
+    #downloadDestinationPath: string | null = null;
 
     protected registerMainEventListeners() {
       const callbacks = super.registerMainEventListeners();
@@ -25,6 +26,7 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
         this.handle("startDownload", (editor: Editor) => {
           return new Promise<void>((resolve) => {
             (async () => {
+              this.#downloadDestinationPath = null;
               this.on(
                 "downloaderModalClose",
                 () => {
@@ -121,6 +123,16 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
             return;
           }
           this.downloader.abortController.abort();
+        }),
+
+        this.handle("openDownloadFolder", async () => {
+          if (!this.#downloadDestinationPath) {
+            return;
+          }
+          const error = await shell.openPath(this.#downloadDestinationPath);
+          if (error) {
+            dialog.showErrorBox("Could not open destination folder", error);
+          }
         })
       ];
     }
@@ -236,6 +248,13 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
         this.downloader.status = "running";
         this.emitRendererEvent(this.win.modalView, "downloaderStart");
         const bundle = this.downloader;
+        const setDestinationPath = (path: string) => {
+          this.#downloadDestinationPath = path;
+          this.emitRendererEvent(this.win.modalView, "downloaderDestination", path);
+        };
+        bundle.instance.on("campaignDir", ({ path }: { path: string }) => {
+          setDestinationPath(path);
+        });
         const signal = bundle.abortController.signal;
         if (collections) {
           const log = (text: string, level: "info" | "error" = "info") =>
@@ -278,6 +297,9 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
             download: async (id, index, total) => {
               log(`Downloading collection ${index + 1} of ${total}: #${id}`);
               bundle.instance = await PatreonDownloader.getInstance(`https://www.patreon.com/collection/${id}`, collections.options);
+              bundle.instance.on("campaignDir", ({ path }: { path: string }) => {
+                setDestinationPath(path);
+              });
               await bundle.instance.start({ signal });
             },
             onFailure: (id, error) => { failures.push(id); log(`Collection #${id} failed: ${getErrorString(error)}`, "error"); },
