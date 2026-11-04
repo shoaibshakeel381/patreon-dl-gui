@@ -388,9 +388,8 @@ function DownloaderModal() {
             <Button
               variant="secondary"
               onClick={() => void window.mainAPI.invoke("openDownloadFolder")}
-              disabled={!destinationPath}
               aria-label="Open creator destination folder"
-              title={destinationPath ?? "Destination folder is not available yet"}
+              title="Open creator destination folder"
             >
               Open folder
             </Button>

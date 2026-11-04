@@ -10,6 +10,7 @@ import { runCollectionQueue } from "../CollectionQueue";
 import { setTimeout as delay } from "node:timers/promises";
 import { encode } from "html-entities";
 import type WebBrowserView from "../views/browser/WebBrowserView";
+import { existsSync } from "node:fs";
 
 export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
   Base: TBase
@@ -126,7 +127,7 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
         }),
 
         this.handle("openDownloadFolder", async () => {
-          if (!this.#downloadDestinationPath) {
+          if (!this.#downloadDestinationPath || !existsSync(this.#downloadDestinationPath)) {
             return;
           }
           const error = await shell.openPath(this.#downloadDestinationPath);
