@@ -127,12 +127,9 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
         }),
 
         this.handle("openDownloadFolder", async () => {
-          if (!this.#downloadDestinationPath || !existsSync(this.#downloadDestinationPath)) {
-            return;
-          }
-          const error = await shell.openPath(this.#downloadDestinationPath);
-          if (error) {
-            dialog.showErrorBox("Could not open destination folder", error);
+          const path = this.#downloadDestinationPath;
+          if (path && existsSync(path)) {
+            await shell.openPath(path);
           }
         })
       ];
@@ -249,12 +246,8 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
         this.downloader.status = "running";
         this.emitRendererEvent(this.win.modalView, "downloaderStart");
         const bundle = this.downloader;
-        const setDestinationPath = (path: string) => {
-          this.#downloadDestinationPath = path;
-          this.emitRendererEvent(this.win.modalView, "downloaderDestination", path);
-        };
         bundle.instance.on("campaignDir", ({ path }: { path: string }) => {
-          setDestinationPath(path);
+          this.#downloadDestinationPath = path;
         });
         const signal = bundle.abortController.signal;
         if (collections) {
@@ -275,7 +268,7 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
           log("Discovering creator collections...");
           await runCollectionQueue({
             starts: [makeURL(false), makeURL(true)],
-            reverseDownloadOrder: collections.options.include.postsSortOrder === "oldest",
+            reverseDownloadOrder: collections.options?.include?.postsSortOrder === "oldest",
             signal,
             wait: () => delay(2000, undefined, { signal }),
             fetchPage: async (url) => {
@@ -301,7 +294,7 @@ export function DownloadEventSupportMixin<TBase extends MainProcessConstructor>(
               log(`Downloading collection ${index + 1} of ${total}: #${id}`);
               bundle.instance = await PatreonDownloader.getInstance(`https://www.patreon.com/collection/${id}`, collections.options);
               bundle.instance.on("campaignDir", ({ path }: { path: string }) => {
-                setDestinationPath(path);
+                this.#downloadDestinationPath = path;
               });
               await bundle.instance.start({ signal });
             },

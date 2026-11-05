@@ -20,7 +20,6 @@ export type MainProcessRendererEvent =
   | "promptOverwriteOnSave"
   | "downloaderInit"
   | "downloaderStart"
-  | "downloaderDestination"
   | "downloaderEnd"
   | "downloaderLogMessage"
   | "execUICommand"
@@ -175,7 +174,6 @@ export type MainProcessRendererEventListener<
   : E extends "promptOverwriteOnSave" ? (config: FileConfig<"hasPath">) => void
   : E extends "downloaderInit" ? (info: DownloaderInitInfo) => void
   : E extends "downloaderStart" ? () => void
-  : E extends "downloaderDestination" ? (path: string) => void
   : E extends "downloaderEnd" ? (info: DownloaderEndInfo) => void
   : E extends "downloaderLogMessage" ? (message: DownloaderLogMessage) => void
   : E extends "requestHelpResult" ? (result: RequestHelpResult) => void
